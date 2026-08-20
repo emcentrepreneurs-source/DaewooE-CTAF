@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, ShieldCheck, Sparkles, Building2, UserCheck, LogOut, Database, RefreshCw, UserPlus, Users } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, Sparkles, Building2, UserCheck, LogOut, Database, RefreshCw } from 'lucide-react';
 import { CCS_JV_LOGO_BASE64 } from '../assets/logo';
 
 interface HeaderProps {
@@ -8,7 +8,6 @@ interface HeaderProps {
   currentUser?: string;
   dbSyncStatus?: 'synced' | 'saving' | 'error';
   onOpenDatabaseModal?: () => void;
-  onOpenUserModal?: () => void;
   onLogout?: () => void;
 }
 
@@ -18,7 +17,6 @@ export const Header: React.FC<HeaderProps> = ({
   currentUser = 'AdminE&C',
   dbSyncStatus = 'synced',
   onOpenDatabaseModal,
-  onOpenUserModal,
   onLogout
 }) => {
   return (
@@ -52,15 +50,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="md:hidden flex items-center gap-2">
-            {onOpenUserModal && (
-              <button
-                onClick={onOpenUserModal}
-                className="p-1.5 bg-indigo-950/60 text-indigo-300 border border-indigo-800 rounded-lg"
-                title="Manage Users"
-              >
-                <Users className="w-4 h-4" />
-              </button>
-            )}
             <div className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-1 rounded-lg">
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{totalTravelers} loaded</span>
@@ -110,44 +99,27 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
 
-          {/* User Profile Badge & Actions */}
-          <div className="flex items-center gap-2 pl-2 border-l border-zinc-700/80">
-            <button
-              onClick={onOpenUserModal}
-              className="flex items-center gap-2 bg-zinc-800/90 hover:bg-zinc-700/90 border border-zinc-700 hover:border-indigo-500/60 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-left group"
-              title="Click to add new user or manage user access"
-            >
-              <div className="w-5 h-5 rounded-full bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center text-indigo-300 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+          {/* User Profile Badge & Logout */}
+          <div className="flex items-center gap-1.5 pl-2 border-l border-zinc-700/80">
+            <div className="flex items-center gap-2 bg-zinc-800/90 border border-zinc-700 px-2.5 py-1.5 rounded-lg">
+              <div className="w-5 h-5 rounded-full bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center text-indigo-300">
                 <UserCheck className="w-3 h-3" />
               </div>
-              <div>
-                <p className="font-semibold text-zinc-200 text-[11px] leading-none flex items-center gap-1">
-                  <span>{currentUser}</span>
-                  <span className="text-[9px] text-indigo-400 font-normal">▼</span>
-                </p>
-                <p className="text-[9.5px] text-zinc-400 leading-tight">Manage Users</p>
+              <div className="text-left">
+                <p className="font-semibold text-zinc-200 text-[11px] leading-none">{currentUser}</p>
+                <p className="text-[9.5px] text-zinc-400 leading-tight">Daewoo E&C</p>
               </div>
-            </button>
-
-            {onOpenUserModal && (
-              <button
-                onClick={onOpenUserModal}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800/70 hover:border-indigo-600 rounded-lg transition-all text-xs font-medium cursor-pointer"
-                title="Add New User to PostgreSQL"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Add User</span>
-              </button>
-            )}
+            </div>
 
             {onLogout && (
               <button
                 id="header-logout-btn"
                 onClick={onLogout}
-                className="flex items-center gap-1 px-2 py-1.5 bg-zinc-800/80 hover:bg-red-950/50 text-zinc-400 hover:text-red-300 border border-zinc-700/80 hover:border-red-800/60 rounded-lg transition-all text-xs font-medium cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-zinc-800/80 hover:bg-red-950/50 text-zinc-400 hover:text-red-300 border border-zinc-700/80 hover:border-red-800/60 rounded-lg transition-all text-xs font-medium cursor-pointer"
                 title="Log out of session"
               >
                 <LogOut className="w-3.5 h-3.5" />
+                <span>Logout</span>
               </button>
             )}
           </div>

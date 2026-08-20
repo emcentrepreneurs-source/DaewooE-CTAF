@@ -27,7 +27,6 @@ interface TravelersTableProps {
   onEditTraveler: (traveler: TravelerRecord) => void;
   onDeleteTraveler: (id: string) => void;
   onAddTraveler?: () => void;
-  onManageUsers?: () => void;
   onBatchSettings: () => void;
   onBatchZipDownload: (selectedOnly?: boolean) => void;
   onCombinedPdfDownload: (selectedOnly?: boolean) => void;
@@ -43,7 +42,6 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
   onEditTraveler,
   onDeleteTraveler,
   onAddTraveler,
-  onManageUsers,
   onBatchSettings,
   onBatchZipDownload,
   onCombinedPdfDownload,

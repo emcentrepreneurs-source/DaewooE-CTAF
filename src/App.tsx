@@ -11,7 +11,6 @@ import { EditTravelerModal } from './components/EditTravelerModal';
 import { BatchSettingsModal, BatchSettings } from './components/BatchSettingsModal';
 import { BatchProgressModal } from './components/BatchProgressModal';
 import { DatabaseModal } from './components/DatabaseModal';
-import { UserManagementModal } from './components/UserManagementModal';
 import {
   FileSpreadsheet,
   FileCheck,
@@ -43,7 +42,6 @@ export default function App() {
   const [editingTraveler, setEditingTraveler] = useState<TravelerRecord | null>(null);
   const [isBatchSettingsOpen, setIsBatchSettingsOpen] = useState(false);
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
-  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [dbSyncStatus, setDbSyncStatus] = useState<'synced' | 'saving' | 'error'>('synced');
   const [batchProgress, setBatchProgress] = useState<BatchProgress>({
     total: 0,
@@ -388,7 +386,6 @@ export default function App() {
         currentUser={currentUser}
         dbSyncStatus={dbSyncStatus}
         onOpenDatabaseModal={() => setIsDatabaseModalOpen(true)}
-        onOpenUserModal={() => setIsUserModalOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -484,7 +481,6 @@ export default function App() {
             onEditTraveler={t => setEditingTraveler(t)}
             onDeleteTraveler={handleDeleteTraveler}
             onAddTraveler={handleAddNewTraveler}
-            onManageUsers={() => setIsUserModalOpen(true)}
             onBatchSettings={() => setIsBatchSettingsOpen(true)}
             onBatchZipDownload={handleBatchZipDownload}
             onCombinedPdfDownload={handleCombinedPdfDownload}
@@ -551,16 +547,6 @@ export default function App() {
         isOpen={isDatabaseModalOpen}
         onClose={() => setIsDatabaseModalOpen(false)}
         dbSyncStatus={dbSyncStatus}
-      />
-
-      <UserManagementModal
-        isOpen={isUserModalOpen}
-        onClose={() => setIsUserModalOpen(false)}
-        currentUser={currentUser || 'AdminE&C'}
-        onSwitchUser={(newUser) => {
-          setCurrentUser(newUser);
-          localStorage.setItem('taf_auth_user', newUser);
-        }}
       />
     </div>
   );
