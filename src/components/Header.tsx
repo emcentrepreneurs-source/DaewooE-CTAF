@@ -74,24 +74,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="font-semibold text-zinc-200">Mozambique LNG</span>
           </div>
 
-          <button
-            onClick={onOpenDatabaseModal}
-            className="flex items-center gap-2 bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/80 px-3 py-1.5 rounded-lg transition-colors cursor-pointer text-left"
-            title="Click to view Supabase / PostgreSQL schema, migrations, and sync state"
-          >
-            <Database className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-zinc-400">DB:</span>
-            {dbSyncStatus === 'saving' ? (
-              <span className="font-semibold text-amber-300 flex items-center gap-1">
-                <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Syncing
-              </span>
-            ) : dbSyncStatus === 'error' ? (
-              <span className="font-semibold text-red-400">Offline</span>
-            ) : (
-              <span className="font-semibold text-emerald-300">PostgreSQL</span>
-            )}
-          </button>
-
           {totalTravelers > 0 && (
             <div className="flex items-center gap-2 bg-indigo-950/60 border border-indigo-800/60 px-3 py-1.5 rounded-lg">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
