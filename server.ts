@@ -4,6 +4,8 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { getAllTravelers, saveTravelers, deleteTravelerById, clearAllTravelers } from './src/db/travelers.ts';
 import { getAllUsers, createUser, deleteUserById, deleteUserByUid, getOrCreateUser } from './src/db/users.ts';
+import { scanIdOrPassport } from './src/server/idScanner.ts';
+import { createDocuPassSession } from './src/server/idAnalyzer.ts';
 
 async function startServer() {
   const app = express();
@@ -155,6 +157,65 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error in POST /api/travelers/clear:', error);
       res.status(500).json({ error: error.message || 'Failed to clear travelers' });
+    }
+  });
+
+  // AI & Optical Scan for Passport / National ID Card (Gemini Vision + ID Analyzer Global 190+ Engine)
+  app.post('/api/scan-id', async (req, res) => {
+    try {
+      const { image, mimeType, provider, idAnalyzerKey } = req.body;
+      if (!image) {
+        return res.status(400).json({ error: 'Image base64 payload is required' });
+      }
+      const extracted = await scanIdOrPassport(image, mimeType || 'image/jpeg', {
+        provider,
+        idAnalyzerKey
+      });
+      res.json({ success: true, data: extracted });
+    } catch (error: any) {
+      console.error('Error in POST /api/scan-id:', error);
+      res.status(500).json({ error: error.message || 'Failed to extract ID information' });
+    }
+  });
+
+  // Batch Scan multiple IDs / Passports
+  app.post('/api/scan-id/batch', async (req, res) => {
+    try {
+      const { images, provider, idAnalyzerKey } = req.body;
+      if (!Array.isArray(images) || images.length === 0) {
+        return res.status(400).json({ error: 'Images array is required' });
+      }
+      const results = [];
+      for (const item of images) {
+        const imgData = typeof item === 'string' ? item : item.image;
+        const mime = typeof item === 'object' && item.mimeType ? item.mimeType : 'image/jpeg';
+        const fileName = typeof item === 'object' && item.name ? item.name : undefined;
+        try {
+          const extracted = await scanIdOrPassport(imgData, mime, {
+            provider,
+            idAnalyzerKey
+          });
+          results.push({ ...extracted, sourceFile: fileName });
+        } catch (err: any) {
+          results.push({ error: err.message, sourceFile: fileName });
+        }
+      }
+      res.json({ success: true, count: results.length, data: results });
+    } catch (error: any) {
+      console.error('Error in POST /api/scan-id/batch:', error);
+      res.status(500).json({ error: error.message || 'Failed to process batch scans' });
+    }
+  });
+
+  // DocuPass Hosted Mobile Flow Session Trigger
+  app.post('/api/docupass/session', async (req, res) => {
+    try {
+      const { idAnalyzerKey, returnUrl } = req.body;
+      const session = await createDocuPassSession(idAnalyzerKey, returnUrl);
+      res.json(session);
+    } catch (error: any) {
+      console.error('Error in POST /api/docupass/session:', error);
+      res.status(500).json({ error: error.message || 'Failed to create DocuPass session' });
     }
   });
 

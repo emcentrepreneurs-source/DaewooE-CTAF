@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { TravelerRecord, BatchProgress } from './types';
+import { TravelerRecord, BatchProgress, SignatureAutomationConfig } from './types';
 import { SAMPLE_TRAVELERS } from './utils/sampleData';
 import { exportTravelersToZip, downloadCombinedPdf } from './utils/zipExporter';
+import { DEFAULT_SIGNATURE_CONFIG } from './utils/signatureAutomationScripts';
 import { Header } from './components/Header';
 import { LoginScreen } from './components/LoginScreen';
 import { FileUploadArea } from './components/FileUploadArea';
@@ -11,6 +12,9 @@ import { EditTravelerModal } from './components/EditTravelerModal';
 import { BatchSettingsModal, BatchSettings } from './components/BatchSettingsModal';
 import { BatchProgressModal } from './components/BatchProgressModal';
 import { DatabaseModal } from './components/DatabaseModal';
+import { IdPassportScannerModal } from './components/IdPassportScannerModal';
+import { SignatureAutomationModal } from './components/SignatureAutomationModal';
+import { Toast, ToastMessage } from './components/Toast';
 import {
   FileSpreadsheet,
   FileCheck,
@@ -21,7 +25,9 @@ import {
   CheckCircle2,
   HelpCircle,
   Clock,
-  Briefcase
+  Briefcase,
+  Camera,
+  FileSignature
 } from 'lucide-react';
 
 export default function App() {
@@ -42,12 +48,35 @@ export default function App() {
   const [editingTraveler, setEditingTraveler] = useState<TravelerRecord | null>(null);
   const [isBatchSettingsOpen, setIsBatchSettingsOpen] = useState(false);
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
+  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+  const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
+  const [signatureConfig, setSignatureConfig] = useState<SignatureAutomationConfig>(() => {
+    const saved = localStorage.getItem('taf_signature_config');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return DEFAULT_SIGNATURE_CONFIG;
+      }
+    }
+    return DEFAULT_SIGNATURE_CONFIG;
+  });
   const [dbSyncStatus, setDbSyncStatus] = useState<'synced' | 'saving' | 'error'>('synced');
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [batchProgress, setBatchProgress] = useState<BatchProgress>({
     total: 0,
     current: 0,
     status: 'idle'
   });
+
+  const addToast = (toast: Omit<ToastMessage, 'id'>) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    setToasts(prev => [...prev, { ...toast, id }]);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
 
   // Fetch travelers from Cloud SQL Database on startup
   useEffect(() => {
@@ -102,7 +131,7 @@ export default function App() {
   }, [currentUser]);
 
   // Helper to persist travelers to Cloud SQL DB
-  const syncToDatabase = async (records: TravelerRecord[]) => {
+  const syncToDatabase = async (records: TravelerRecord[]): Promise<boolean> => {
     try {
       setDbSyncStatus('saving');
       const payload = records.map(r => ({
@@ -140,12 +169,15 @@ export default function App() {
 
       if (res.ok) {
         setDbSyncStatus('synced');
+        return true;
       } else {
         setDbSyncStatus('error');
+        return false;
       }
     } catch (err) {
       console.error('Failed to sync to database:', err);
       setDbSyncStatus('error');
+      return false;
     }
   };
 
@@ -216,7 +248,7 @@ export default function App() {
   };
 
   // Edit traveler save
-  const handleSaveTraveler = (updated: TravelerRecord) => {
+  const handleSaveTraveler = async (updated: TravelerRecord) => {
     const exists = travelers.some(t => t.id === updated.id);
     const nextList = exists
       ? travelers.map(t => (t.id === updated.id ? updated : t))
@@ -225,7 +257,23 @@ export default function App() {
     if (!exists) {
       setSelectedIds(prev => [updated.id, ...prev]);
     }
-    syncToDatabase(nextList);
+    const success = await syncToDatabase(nextList);
+    if (success) {
+      addToast({
+        title: exists ? 'Changes Saved' : 'Traveler Added',
+        message: `${updated.surname || 'Traveler'} (${updated.passportOrIdNumber || 'ID'}) synced to database.`,
+        type: 'success',
+        showDatabaseBadge: true,
+        duration: 3500
+      });
+    } else {
+      addToast({
+        title: 'Saved Locally',
+        message: `${updated.surname || 'Traveler'} saved locally, but database sync encountered an issue.`,
+        type: 'error',
+        duration: 4500
+      });
+    }
   };
 
   // Add new blank traveler
@@ -276,8 +324,26 @@ export default function App() {
     setEditingTraveler(blankTraveler);
   };
 
+  // Add travelers extracted from ID / Passport Optical & AI Scanner
+  const handleAddTravelersFromScanner = async (newTravelers: TravelerRecord[]) => {
+    if (!newTravelers || newTravelers.length === 0) return;
+    const updated = [...newTravelers, ...travelers];
+    setTravelers(updated);
+    setSelectedIds(prev => [...newTravelers.map(t => t.id), ...prev]);
+    const success = await syncToDatabase(updated);
+    if (success) {
+      addToast({
+        title: 'ID Scan Added',
+        message: `${newTravelers.length} traveler${newTravelers.length > 1 ? 's' : ''} added & synced to database.`,
+        type: 'success',
+        showDatabaseBadge: true,
+        duration: 3500
+      });
+    }
+  };
+
   // Batch update settings across travelers
-  const handleApplyBatchSettings = (settings: BatchSettings) => {
+  const handleApplyBatchSettings = async (settings: BatchSettings) => {
     const nextList = travelers.map(t => {
       // Only update selected if any selected, otherwise all
       if (selectedIds.length > 0 && !selectedIds.includes(t.id)) {
@@ -322,7 +388,16 @@ export default function App() {
     });
 
     setTravelers(nextList);
-    syncToDatabase(nextList);
+    const success = await syncToDatabase(nextList);
+    if (success) {
+      addToast({
+        title: 'Batch Updates Synced',
+        message: 'Flight & camp parameters applied to selected travelers in database.',
+        type: 'success',
+        showDatabaseBadge: true,
+        duration: 3500
+      });
+    }
   };
 
   // Batch ZIP Export
@@ -374,6 +449,23 @@ export default function App() {
     downloadCombinedPdf(listToExport);
   };
 
+  const handleSaveSignatureConfig = (updatedConfig: SignatureAutomationConfig) => {
+    setSignatureConfig(updatedConfig);
+    localStorage.setItem('taf_signature_config', JSON.stringify(updatedConfig));
+
+    // If autoStampGeneratedFiles is enabled, apply signature details to all travelers in memory
+    if (updatedConfig.autoStampGeneratedFiles) {
+      setTravelers(prev =>
+        prev.map(t => ({
+          ...t,
+          signatureDate: updatedConfig.signatureDate || t.signatureDate,
+          signatureName: updatedConfig.signatureName || t.signatureName,
+          signatureImage: updatedConfig.signatureImageBase64 || t.signatureImage
+        }))
+      );
+    }
+  };
+
   const currentPreviewTraveler = travelers[previewIndex] || travelers[0];
   const readyCount = travelers.filter(t => t.isValid !== false).length;
 
@@ -386,6 +478,7 @@ export default function App() {
         currentUser={currentUser}
         dbSyncStatus={dbSyncStatus}
         onOpenDatabaseModal={() => setIsDatabaseModalOpen(true)}
+        onOpenSignatureModal={() => setIsSignatureModalOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -406,17 +499,24 @@ export default function App() {
               <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-100">
                 Upload Excel ➔ Generate 10+ Standard TAF PDFs in 1-Click
               </h1>
-              <p className="text-xs text-zinc-400 mt-1 max-w-2xl leading-relaxed">
-                Automatically extracts traveler names, passport IDs, Solenta flight schedules, and camp accommodation into pixel-perfect PDF replicas matching the CCS JV template.
-              </p>
             </div>
 
-            {/* Quick Action Button */}
-            <div className="flex items-center gap-2.5 w-full md:w-auto">
+            {/* Quick Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+              <button
+                id="hero-scan-passport-btn"
+                onClick={() => setIsScannerModalOpen(true)}
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-950/80 hover:bg-indigo-900/90 text-indigo-300 border border-indigo-700/70 font-semibold text-xs px-4 py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                title="Scan ID or Passport using Camera or Photo OCR"
+              >
+                <Camera className="w-4 h-4 text-indigo-400" />
+                <span>Scan ID / Passport (AI OCR)</span>
+              </button>
+
               <button
                 id="hero-generate-all-btn"
                 onClick={() => handleBatchZipDownload(false)}
-                className="w-full md:w-auto flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-6 py-3 rounded-xl shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-6 py-3 rounded-xl shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               >
                 <FileArchive className="w-4 h-4" />
                 <span>Generate All {travelers.length} TAFs (ZIP)</span>
@@ -426,7 +526,10 @@ export default function App() {
         </div>
 
         {/* 1. File Upload Drop Area */}
-        <FileUploadArea onTravelersLoaded={handleTravelersLoaded} />
+        <FileUploadArea
+          onTravelersLoaded={handleTravelersLoaded}
+          onOpenScanner={() => setIsScannerModalOpen(true)}
+        />
 
         {/* 2. Navigation Tabs */}
         <div className="flex items-center justify-between border-b border-zinc-800 pb-1">
@@ -481,6 +584,8 @@ export default function App() {
             onEditTraveler={t => setEditingTraveler(t)}
             onDeleteTraveler={handleDeleteTraveler}
             onAddTraveler={handleAddNewTraveler}
+            onOpenScanner={() => setIsScannerModalOpen(true)}
+            onOpenSignatureModal={() => setIsSignatureModalOpen(true)}
             onBatchSettings={() => setIsBatchSettingsOpen(true)}
             onBatchZipDownload={handleBatchZipDownload}
             onCombinedPdfDownload={handleCombinedPdfDownload}
@@ -518,6 +623,20 @@ export default function App() {
       </footer>
 
       {/* Modals */}
+      <IdPassportScannerModal
+        isOpen={isScannerModalOpen}
+        onClose={() => setIsScannerModalOpen(false)}
+        onAddTravelers={handleAddTravelersFromScanner}
+      />
+
+      <SignatureAutomationModal
+        isOpen={isSignatureModalOpen}
+        onClose={() => setIsSignatureModalOpen(false)}
+        config={signatureConfig}
+        onSaveConfig={handleSaveSignatureConfig}
+        onToast={addToast}
+      />
+
       <EditTravelerModal
         traveler={editingTraveler}
         isOpen={!!editingTraveler}
@@ -548,6 +667,9 @@ export default function App() {
         onClose={() => setIsDatabaseModalOpen(false)}
         dbSyncStatus={dbSyncStatus}
       />
+
+      {/* Global Toast Notifications */}
+      <Toast toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

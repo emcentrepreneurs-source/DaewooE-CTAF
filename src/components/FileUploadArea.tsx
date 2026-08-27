@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { UploadCloud, FileSpreadsheet, Download, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, FileSpreadsheet, Download, Sparkles, AlertCircle, CheckCircle2, Camera } from 'lucide-react';
 import { generateSampleExcelBlob, SAMPLE_TRAVELERS } from '../utils/sampleData';
 import { parseExcelFile } from '../utils/excelParser';
 import { TravelerRecord } from '../types';
@@ -7,11 +7,13 @@ import { saveAs } from 'file-saver';
 
 interface FileUploadAreaProps {
   onTravelersLoaded: (travelers: TravelerRecord[], fileName: string) => void;
+  onOpenScanner?: () => void;
   isLoading?: boolean;
 }
 
 export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
   onTravelersLoaded,
+  onOpenScanner,
   isLoading = false
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -100,7 +102,19 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          {onOpenScanner && (
+            <button
+              id="scan-passport-id-btn"
+              onClick={onOpenScanner}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-98 px-3.5 py-2 rounded-lg shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+              title="Scan Passport or National ID card with Camera or Photo Upload"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>Scan ID / Passport (AI OCR)</span>
+            </button>
+          )}
+
           <button
             id="download-template-btn"
             onClick={handleDownloadTemplate}

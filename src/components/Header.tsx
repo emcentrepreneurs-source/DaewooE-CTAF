@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, ShieldCheck, Sparkles, Building2, UserCheck, LogOut, Database, RefreshCw } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, Sparkles, Building2, UserCheck, LogOut, Database, RefreshCw, FileSignature, Code2 } from 'lucide-react';
 import { CCS_JV_LOGO_BASE64 } from '../assets/logo';
 
 interface HeaderProps {
@@ -8,6 +8,7 @@ interface HeaderProps {
   currentUser?: string;
   dbSyncStatus?: 'synced' | 'saving' | 'error';
   onOpenDatabaseModal?: () => void;
+  onOpenSignatureModal?: () => void;
   onLogout?: () => void;
 }
 
@@ -17,6 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentUser = 'AdminE&C',
   dbSyncStatus = 'synced',
   onOpenDatabaseModal,
+  onOpenSignatureModal,
   onLogout
 }) => {
   return (
@@ -50,6 +52,15 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="md:hidden flex items-center gap-2">
+            {onOpenSignatureModal && (
+              <button
+                onClick={onOpenSignatureModal}
+                className="p-1.5 bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 rounded-lg border border-indigo-700/60 transition-colors"
+                title="Signature & Automation Scripts"
+              >
+                <FileSignature className="w-4 h-4" />
+              </button>
+            )}
             <div className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-1 rounded-lg">
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{totalTravelers} loaded</span>
@@ -68,6 +79,19 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Info Badges & User Profile */}
         <div className="hidden md:flex items-center gap-3 text-xs">
+          {/* Signature & Automation Code Hub Button */}
+          {onOpenSignatureModal && (
+            <button
+              id="header-signature-automation-btn"
+              onClick={onOpenSignatureModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-950/70 hover:bg-indigo-900 text-indigo-200 hover:text-white border border-indigo-700/70 hover:border-indigo-500 rounded-lg transition-all font-medium cursor-pointer shadow-sm"
+              title="Configure automated signature appending and view Python & Google Docs API scripts"
+            >
+              <FileSignature className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Signature & Automation Scripts</span>
+            </button>
+          )}
+
           <div className="flex items-center gap-2 bg-zinc-800/80 border border-zinc-700/80 px-3 py-1.5 rounded-lg">
             <Building2 className="w-3.5 h-3.5 text-zinc-400" />
             <span className="text-zinc-400">Project:</span>

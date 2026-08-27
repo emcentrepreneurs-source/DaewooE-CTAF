@@ -109,3 +109,43 @@ export interface UserAccount {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface SignatureAutomationConfig {
+  mode: 'image' | 'text_block' | 'both';
+  signatureName: string;
+  signerTitle: string;
+  organization: string;
+  department: string;
+  signatureDate: string;
+  signatureImageBase64: string;
+  includeLegalDisclaimer: boolean;
+  legalDisclaimerText: string;
+  includeTimestamp: boolean;
+  includeSupervisorBlock: boolean;
+  includeHrBlock: boolean;
+  textBlockTemplate: string;
+  autoStampGeneratedFiles: boolean;
+}
+
+export type ActivityActionType =
+  | 'Batch Generated'
+  | 'Traveler Modified'
+  | 'ID Scanned'
+  | 'Traveler Added'
+  | 'Traveler Deleted'
+  | 'Batch Parameters Applied'
+  | 'Signature Updated'
+  | 'Manifest Imported'
+  | 'Database Synced'
+  | 'PDF Combined Export';
+
+export interface ActivityLogItem {
+  id: string;
+  action: ActivityActionType | string;
+  user: string;
+  details: string;
+  timestamp: string; // Formatted or ISO timestamp
+  targetId?: string;
+  badgeColor?: 'indigo' | 'emerald' | 'amber' | 'blue' | 'purple' | 'rose' | 'cyan';
+  count?: number;
+}

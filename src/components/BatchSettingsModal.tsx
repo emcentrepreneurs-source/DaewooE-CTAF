@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TravelerRecord, PurposeOfTrip } from '../types';
-import { X, Check, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { X, Check, SlidersHorizontal, Sparkles, Calendar, Clock, AlertCircle } from 'lucide-react';
+import {
+  validateDate,
+  validateTime,
+  validateFlightTimes,
+  formatToStandardDate
+} from '../utils/dateTimeValidation';
+import { DrumWheelPickerModal } from './DrumWheelPickerModal';
+import { DrumPickerTriggerButton } from './DrumPickerTriggerButton';
 
 interface BatchSettingsModalProps {
   isOpen: boolean;
@@ -51,6 +59,56 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
   const [rotationType, setRotationType] = useState('Mobilization');
   const [purposeOfTrip, setPurposeOfTrip] = useState<PurposeOfTrip>('Mobilization');
 
+  // Scroll Wheel / Drum Picker modal state
+  const [drumPickerState, setDrumPickerState] = useState<{
+    isOpen: boolean;
+    mode: 'date' | 'time';
+    title: string;
+    initialValue: string;
+    dateFormat?: 'dob' | 'short' | 'full' | 'iso';
+    context?: 'dob' | 'passportExpiry' | 'flightDate' | 'signatureDate' | 'checkIn' | 'checkOut' | 'time';
+    onConfirm: (val: string) => void;
+  }>({
+    isOpen: false,
+    mode: 'date',
+    title: '',
+    initialValue: '',
+    onConfirm: () => {}
+  });
+
+  const openDrumDatePicker = (
+    title: string,
+    initialValue: string,
+    dateFormat: 'dob' | 'short' | 'full' | 'iso',
+    context: 'dob' | 'passportExpiry' | 'flightDate' | 'signatureDate' | 'checkIn' | 'checkOut',
+    onConfirm: (val: string) => void
+  ) => {
+    setDrumPickerState({
+      isOpen: true,
+      mode: 'date',
+      title,
+      initialValue: initialValue || '8/9/2026',
+      dateFormat,
+      context,
+      onConfirm
+    });
+  };
+
+  const openDrumTimePicker = (
+    title: string,
+    initialValue: string,
+    onConfirm: (val: string) => void
+  ) => {
+    setDrumPickerState({
+      isOpen: true,
+      mode: 'time',
+      title,
+      initialValue: initialValue || '06:45',
+      context: 'time',
+      onConfirm
+    });
+  };
+
   // Checkbox toggles for what to apply
   const [applyFlight, setApplyFlight] = useState(true);
   const [applyAccommodation, setApplyAccommodation] = useState(true);
@@ -58,7 +116,23 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
   const [applySignatureName, setApplySignatureName] = useState(true);
   const [applyRotation, setApplyRotation] = useState(true);
 
+  // Validations
+  const flightDateValidation = useMemo(() => validateDate(flightDate, 'Flight Date'), [flightDate]);
+  const depTimeValidation = useMemo(() => validateTime(departureTime, 'Departure Time'), [departureTime]);
+  const arrTimeValidation = useMemo(() => validateTime(arrivalTime, 'Arrival Time'), [arrivalTime]);
+  const flightTimesValidation = useMemo(
+    () => validateFlightTimes(departureTime, arrivalTime),
+    [departureTime, arrivalTime]
+  );
+  const signatureDateValidation = useMemo(() => validateDate(signatureDate, 'Signature Date'), [signatureDate]);
+
+  const hasFlightErrors = applyFlight && (!flightDateValidation.isValid || !depTimeValidation.isValid || !arrTimeValidation.isValid);
+  const hasSignatureErrors = applySignatureDate && !signatureDateValidation.isValid;
+  const isFormValid = !hasFlightErrors && !hasSignatureErrors;
+
   const handleApply = () => {
+    if (!isFormValid) return;
+
     const settings: BatchSettings = {};
     if (applyFlight) {
       settings.flightDate = flightDate;
@@ -109,7 +183,7 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
+            className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -137,16 +211,51 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
             {applyFlight && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2">
                 <div>
-                  <label className="block text-[10px] font-medium text-zinc-400 mb-1">
-                    FLIGHT DATE
-                  </label>
-                  <input
-                    type="text"
-                    value={flightDate}
-                    onChange={e => setFlightDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-medium text-zinc-400 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-indigo-400" />
+                      FLIGHT DATE
+                    </label>
+                    <DrumPickerTriggerButton
+                      onClick={() =>
+                        openDrumDatePicker(
+                          'Batch: Select Flight Date',
+                          flightDate,
+                          'short',
+                          'flightDate',
+                          val => setFlightDate(val)
+                        )
+                      }
+                      title="Open Scroll Wheel / Drum Date Picker for Flight Date"
+                    />
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="M/D/YYYY"
+                      value={flightDate}
+                      onChange={e => setFlightDate(e.target.value)}
+                      className={`w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono ${
+                        !flightDateValidation.isValid ? 'border-rose-500 text-rose-200' : 'border-zinc-700 text-zinc-100'
+                      }`}
+                    />
+                    <input
+                      type="date"
+                      aria-label="Pick Flight Date"
+                      className="absolute right-2 top-1.5 opacity-0 w-5 h-5 cursor-pointer"
+                      onChange={e => {
+                        if (e.target.value) {
+                          const parsed = new Date(e.target.value + 'T00:00:00');
+                          setFlightDate(formatToStandardDate(parsed, 'short'));
+                        }
+                      }}
+                    />
+                  </div>
+                  {!flightDateValidation.isValid && (
+                    <p className="text-[10px] text-rose-400 mt-1">{flightDateValidation.error}</p>
+                  )}
                 </div>
+
                 <div>
                   <label className="block text-[10px] font-medium text-zinc-400 mb-1">
                     FROM
@@ -158,6 +267,7 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
                     className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
+
                 <div>
                   <label className="block text-[10px] font-medium text-zinc-400 mb-1">
                     TO
@@ -169,28 +279,69 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
                     className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-[10px] font-medium text-zinc-400 mb-1">
-                    DEP TIME
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-medium text-zinc-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-indigo-400" />
+                      DEP TIME
+                    </label>
+                    <DrumPickerTriggerButton
+                      onClick={() =>
+                        openDrumTimePicker(
+                          'Batch: Select Departure Time',
+                          departureTime,
+                          val => setDepartureTime(val)
+                        )
+                      }
+                      title="Open Scroll Wheel / Drum Time Picker for Departure Time"
+                    />
+                  </div>
                   <input
                     type="text"
+                    placeholder="06:45"
                     value={departureTime}
                     onChange={e => setDepartureTime(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono ${
+                      !depTimeValidation.isValid ? 'border-rose-500 text-rose-200' : 'border-zinc-700 text-zinc-100'
+                    }`}
                   />
+                  {!depTimeValidation.isValid && (
+                    <p className="text-[10px] text-rose-400 mt-1">{depTimeValidation.error}</p>
+                  )}
                 </div>
+
                 <div>
-                  <label className="block text-[10px] font-medium text-zinc-400 mb-1">
-                    ARR TIME
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-medium text-zinc-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-indigo-400" />
+                      ARR TIME
+                    </label>
+                    <DrumPickerTriggerButton
+                      onClick={() =>
+                        openDrumTimePicker(
+                          'Batch: Select Arrival Time',
+                          arrivalTime,
+                          val => setArrivalTime(val)
+                        )
+                      }
+                      title="Open Scroll Wheel / Drum Time Picker for Arrival Time"
+                    />
+                  </div>
                   <input
                     type="text"
+                    placeholder="07:30"
                     value={arrivalTime}
                     onChange={e => setArrivalTime(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono ${
+                      !arrTimeValidation.isValid ? 'border-rose-500 text-rose-200' : 'border-zinc-700 text-zinc-100'
+                    }`}
                   />
+                  {!arrTimeValidation.isValid && (
+                    <p className="text-[10px] text-rose-400 mt-1">{arrTimeValidation.error}</p>
+                  )}
                 </div>
+
                 <div>
                   <label className="block text-[10px] font-medium text-zinc-400 mb-1">
                     AIRLINE
@@ -279,16 +430,49 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
             {applySignatureDate && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                 <div>
-                  <label className="block text-[10px] font-medium text-zinc-400 mb-1">
-                    FORM SIGNATURE DATE
-                  </label>
-                  <input
-                    type="text"
-                    value={signatureDate}
-                    onChange={e => setSignatureDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg font-mono focus:ring-2 focus:ring-indigo-500"
-                    placeholder="e.g. 06 AUGUST 2026"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-medium text-zinc-400 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-indigo-400" />
+                      FORM SIGNATURE DATE
+                    </label>
+                    <DrumPickerTriggerButton
+                      onClick={() =>
+                        openDrumDatePicker(
+                          'Batch: Select Form Signature Date',
+                          signatureDate,
+                          'full',
+                          'signatureDate',
+                          val => setSignatureDate(val)
+                        )
+                      }
+                      title="Open Scroll Wheel / Drum Date Picker for Signature Date"
+                    />
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={signatureDate}
+                      onChange={e => setSignatureDate(e.target.value)}
+                      className={`w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border rounded-lg font-mono focus:ring-2 focus:ring-indigo-500 ${
+                        !signatureDateValidation.isValid ? 'border-rose-500 text-rose-200' : 'border-zinc-700 text-zinc-100'
+                      }`}
+                      placeholder="e.g. 06 AUGUST 2026"
+                    />
+                    <input
+                      type="date"
+                      aria-label="Pick Signature Date"
+                      className="absolute right-2 top-1.5 opacity-0 w-5 h-5 cursor-pointer"
+                      onChange={e => {
+                        if (e.target.value) {
+                          const parsed = new Date(e.target.value + 'T00:00:00');
+                          setSignatureDate(formatToStandardDate(parsed, 'full'));
+                        }
+                      }}
+                    />
+                  </div>
+                  {!signatureDateValidation.isValid && (
+                    <p className="text-[10px] text-rose-400 mt-1">{signatureDateValidation.error}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[10px] font-medium text-zinc-400 mb-1">
@@ -308,25 +492,49 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-zinc-800 bg-zinc-900/90 flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            id="apply-batch-settings-btn"
-            onClick={handleApply}
-            className="flex items-center gap-1.5 px-5 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg shadow-lg hover:shadow-indigo-500/20 transition-all"
-          >
-            <Sparkles className="w-4 h-4" />
-            Apply to {travelerCount} Travelers
-          </button>
+        <div className="px-6 py-4 border-t border-zinc-800 bg-zinc-900/90 flex items-center justify-between gap-2.5">
+          <div>
+            {!isFormValid && (
+              <span className="text-xs text-rose-400 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                Please correct invalid date/time fields before applying.
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              id="apply-batch-settings-btn"
+              disabled={!isFormValid}
+              onClick={handleApply}
+              className="flex items-center gap-1.5 px-5 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-lg hover:shadow-indigo-500/20 transition-all cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" />
+              Apply to {travelerCount} Travelers
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Drum Wheel Picker Modal for Batch Settings */}
+      <DrumWheelPickerModal
+        isOpen={drumPickerState.isOpen}
+        onClose={() => setDrumPickerState(prev => ({ ...prev, isOpen: false }))}
+        mode={drumPickerState.mode}
+        title={drumPickerState.title}
+        initialValue={drumPickerState.initialValue}
+        dateFormat={drumPickerState.dateFormat}
+        context={drumPickerState.context}
+        onConfirm={drumPickerState.onConfirm}
+      />
     </div>
   );
 };
+

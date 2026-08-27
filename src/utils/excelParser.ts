@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { TravelerRecord, FlightEntry, AccommodationEntry, PurposeOfTrip } from '../types';
+import { validateTravelerDatesAndTimes } from './dateTimeValidation';
 
 // Helper to normalize strings for comparison
 function cleanStr(val: any): string {
@@ -210,6 +211,22 @@ export function parseExcelFile(data: ArrayBuffer | Uint8Array): {
     if (!surname) validationErrors.push('Missing Surname');
     if (!passportOrIdNumber) validationErrors.push('Missing Passport / ID');
     if (!projectPosition) validationErrors.push('Missing Job Title');
+
+    const tempRecord = {
+      surname: surname.toUpperCase(),
+      nameAndGender: nameAndGender.toUpperCase(),
+      passportOrIdNumber,
+      dateOfBirth,
+      passportExpiryDate,
+      flights,
+      accommodation,
+      signatureDate
+    };
+
+    const dtValidation = validateTravelerDatesAndTimes(tempRecord);
+    if (!dtValidation.isValid || dtValidation.hasWarnings) {
+      validationErrors.push(...dtValidation.allMessages);
+    }
 
     return {
       id: `TRV-${String(index + 1).padStart(3, '0')}`,

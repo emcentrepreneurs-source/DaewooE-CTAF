@@ -14,9 +14,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   Users,
-  UserPlus
+  UserPlus,
+  Clock,
+  Calendar,
+  FileSignature
 } from 'lucide-react';
 import { downloadSinglePdf } from '../utils/zipExporter';
+import { validateTravelerDatesAndTimes } from '../utils/dateTimeValidation';
 
 interface TravelersTableProps {
   travelers: TravelerRecord[];
@@ -27,6 +31,8 @@ interface TravelersTableProps {
   onEditTraveler: (traveler: TravelerRecord) => void;
   onDeleteTraveler: (id: string) => void;
   onAddTraveler?: () => void;
+  onOpenScanner?: () => void;
+  onOpenSignatureModal?: () => void;
   onBatchSettings: () => void;
   onBatchZipDownload: (selectedOnly?: boolean) => void;
   onCombinedPdfDownload: (selectedOnly?: boolean) => void;
@@ -42,6 +48,8 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
   onEditTraveler,
   onDeleteTraveler,
   onAddTraveler,
+  onOpenScanner,
+  onOpenSignatureModal,
   onBatchSettings,
   onBatchZipDownload,
   onCombinedPdfDownload,
@@ -129,6 +137,18 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
               >
                 <UserPlus className="w-3.5 h-3.5 text-indigo-400" />
                 Add Traveler
+              </button>
+            )}
+
+            {onOpenSignatureModal && (
+              <button
+                id="table-signature-automation-btn"
+                onClick={onOpenSignatureModal}
+                className="flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 bg-zinc-800 hover:bg-indigo-950/70 text-zinc-200 hover:text-indigo-200 rounded-lg border border-zinc-700 hover:border-indigo-600/70 transition-colors cursor-pointer"
+                title="Configure signature appending and view Python & Google Docs API scripts"
+              >
+                <FileSignature className="w-3.5 h-3.5 text-indigo-400" />
+                Signature & Scripts
               </button>
             )}
 
@@ -267,6 +287,8 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
                 const isSelected = selectedIds.includes(t.id);
                 const flight = t.flights?.[0];
                 const acc = t.accommodation?.[0];
+                const dtStatus = validateTravelerDatesAndTimes(t);
+                const hasDtIssues = !dtStatus.isValid || dtStatus.hasWarnings;
 
                 return (
                   <tr
@@ -337,8 +359,18 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
                       <div className="font-mono text-zinc-200 text-[11px]">
                         {t.passportOrIdNumber || <span className="text-red-400 italic">Missing</span>}
                       </div>
-                      <div className="text-[10px] text-zinc-500">
-                        DOB: {t.dateOfBirth || '-'}
+                      <div className="text-[10px] text-zinc-500 flex items-center gap-1">
+                        <span>DOB: {t.dateOfBirth || '-'}</span>
+                        {dtStatus.errors.dateOfBirth && (
+                          <span className="text-rose-400" title={dtStatus.errors.dateOfBirth}>
+                            ⚠️
+                          </span>
+                        )}
+                        {dtStatus.errors.passportExpiryDate && (
+                          <span className="text-rose-400" title={dtStatus.errors.passportExpiryDate}>
+                            ⚠️
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -349,8 +381,22 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
                         <span className="text-zinc-500">→</span>
                         <span>{flight?.to || 'AFUNGI'}</span>
                       </div>
-                      <div className="text-[10px] text-zinc-500">
-                        {flight?.date} • {flight?.airlineAndFlightNo}
+                      <div className="text-[10px] text-zinc-500 flex items-center gap-1">
+                        <span>
+                          {flight?.date} • {flight?.departureTime || '06:45'}
+                        </span>
+                        {(dtStatus.errors.flightDate || dtStatus.errors.departureTime || dtStatus.errors.arrivalTime) && (
+                          <span
+                            className="text-rose-400"
+                            title={
+                              dtStatus.errors.flightDate ||
+                              dtStatus.errors.departureTime ||
+                              dtStatus.errors.arrivalTime
+                            }
+                          >
+                            ⚠️
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -366,15 +412,15 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
 
                     {/* Status */}
                     <td className="py-2.5 px-3">
-                      {t.isValid !== false ? (
+                      {t.isValid !== false && !hasDtIssues ? (
                         <span className="inline-flex items-center gap-1 bg-emerald-950/60 text-emerald-400 text-[10px] font-medium px-2 py-0.5 rounded-full border border-emerald-800/60">
                           <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                           Ready
                         </span>
                       ) : (
                         <span
-                          className="inline-flex items-center gap-1 bg-amber-950/60 text-amber-400 text-[10px] font-medium px-2 py-0.5 rounded-full border border-amber-800/60"
-                          title={t.validationErrors?.join(', ')}
+                          className="inline-flex items-center gap-1 bg-amber-950/60 text-amber-400 text-[10px] font-medium px-2 py-0.5 rounded-full border border-amber-800/60 cursor-help"
+                          title={[...(t.validationErrors || []), ...dtStatus.allMessages].filter((v, i, a) => a.indexOf(v) === i).join(', ')}
                         >
                           <AlertTriangle className="w-3 h-3 text-amber-400" />
                           Check

@@ -1,6 +1,6 @@
 {
   "name": "CCS JV Travel & Accommodation Form Generator",
-  "description": "Bulk generator for CCS JV Travel & Accommodation Request (TAF/TAR) PDF forms from Excel files with batch processing and instant preview.",
-  "requestFramePermissions": [],
+  "description": "Bulk generator for CCS JV Travel & Accommodation Request (TAF/TAR) PDF forms from Excel files with batch processing, AI ID/Passport scanner, and instant preview.",
+  "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
