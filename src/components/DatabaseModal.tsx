@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Database,
@@ -12,13 +12,23 @@ import {
   Code2,
   Key,
   ExternalLink,
-  Table
+  Table,
+  History,
+  User,
+  Clock,
+  Sparkles,
+  Check,
+  RefreshCw,
+  FileText
 } from 'lucide-react';
+import { ActivityLogItem } from '../types';
+import { getStoredActivityLogs, INITIAL_SAMPLE_ACTIVITY_LOGS } from '../utils/activityLogger';
 
 interface DatabaseModalProps {
   isOpen: boolean;
   onClose: () => void;
   dbSyncStatus?: 'synced' | 'saving' | 'error';
+  activityLogs?: ActivityLogItem[];
 }
 
 const SUPABASE_MIGRATION_SQL = `-- ==============================================================================
@@ -153,9 +163,17 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
   isOpen,
   onClose,
   dbSyncStatus = 'synced',
+  activityLogs
 }) => {
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'migration' | 'schema' | 'guide'>('migration');
+  const [activeTab, setActiveTab] = useState<'migration' | 'schema' | 'guide' | 'activity'>('migration');
+  const [logs, setLogs] = useState<ActivityLogItem[]>(() => activityLogs || getStoredActivityLogs());
+
+  useEffect(() => {
+    if (isOpen) {
+      setLogs(activityLogs || getStoredActivityLogs());
+    }
+  }, [isOpen, activityLogs, activeTab]);
 
   if (!isOpen) return null;
 
@@ -243,6 +261,20 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
             >
               <Terminal className="w-3.5 h-3.5" />
               Connection Guide
+            </button>
+            <button
+              onClick={() => setActiveTab('activity')}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'activity'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>Activity Log</span>
+              <span className="bg-zinc-800/90 text-zinc-300 text-[10px] px-1.5 py-0.2 rounded-full font-mono">
+                {logs.slice(0, 10).length}
+              </span>
             </button>
           </div>
 
@@ -377,6 +409,50 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
                     <li>• default_signature_image</li>
                   </ul>
                 </div>
+
+                {/* DaWinci Configs Card */}
+                <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-zinc-100 flex items-center gap-1.5">
+                      <Table className="w-4 h-4 text-indigo-400" />
+                      dawinci_configs
+                    </span>
+                    <span className="text-[10px] bg-indigo-950 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-800">
+                      DaWinci Portal
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">
+                    Stores DaWinci portal endpoints, user credentials/tokens, and project sync metadata.
+                  </p>
+                  <ul className="text-[10px] text-zinc-400 space-y-1 font-mono pt-1 border-t border-zinc-800">
+                    <li>• id (SERIAL PRIMARY KEY)</li>
+                    <li>• user_uid, portal_url, username</li>
+                    <li>• project_code (TEPMA1), active_roster</li>
+                    <li>• last_sync_at, synced_count</li>
+                  </ul>
+                </div>
+
+                {/* DaWinci Sync Logs Card */}
+                <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-zinc-100 flex items-center gap-1.5">
+                      <Table className="w-4 h-4 text-cyan-400" />
+                      dawinci_sync_logs
+                    </span>
+                    <span className="text-[10px] bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800">
+                      Sync Audits
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">
+                    Records historical synchronization audit trails, records imported count, and sync status.
+                  </p>
+                  <ul className="text-[10px] text-zinc-400 space-y-1 font-mono pt-1 border-t border-zinc-800">
+                    <li>• id (SERIAL PRIMARY KEY)</li>
+                    <li>• user_uid, portal_url, status</li>
+                    <li>• records_imported, message</li>
+                    <li>• created_at</li>
+                  </ul>
+                </div>
               </div>
             </div>
           )}
@@ -412,6 +488,111 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
                 <p>
                   The app is currently connected to the provisioned <span className="font-semibold text-white">PostgreSQL Cloud SQL</span> instance with active Drizzle ORM schema synchronization, and is 100% compatible with Supabase PostgreSQL!
                 </p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'activity' && (
+            <div className="space-y-3.5">
+              {/* Audit Header Banner */}
+              <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-zinc-100 text-xs flex items-center gap-1.5">
+                      <History className="w-4 h-4 text-indigo-400" />
+                      User Accountability & Operations Trail
+                    </h3>
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+                      Last 10 Actions
+                    </span>
+                  </div>
+                  <p className="text-zinc-400 text-[11px] mt-0.5">
+                    Immutable activity records tracking batch generation, traveler modifications, document scans, and system exports with precise timestamps.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setLogs(getStoredActivityLogs())}
+                    className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] rounded-lg border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    title="Refresh latest logged activities"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Refresh</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Activity Log List */}
+              <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+                {logs.slice(0, 10).map((item, idx) => {
+                  // Badge color mapping
+                  const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+                    purple: { bg: 'bg-purple-500/15', text: 'text-purple-300', border: 'border-purple-500/30' },
+                    amber: { bg: 'bg-amber-500/15', text: 'text-amber-300', border: 'border-amber-500/30' },
+                    cyan: { bg: 'bg-cyan-500/15', text: 'text-cyan-300', border: 'border-cyan-500/30' },
+                    emerald: { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-500/30' },
+                    rose: { bg: 'bg-rose-500/15', text: 'text-rose-300', border: 'border-rose-500/30' },
+                    blue: { bg: 'bg-blue-500/15', text: 'text-blue-300', border: 'border-blue-500/30' },
+                    indigo: { bg: 'bg-indigo-500/15', text: 'text-indigo-300', border: 'border-indigo-500/30' }
+                  };
+                  const styling = colorMap[item.badgeColor || 'indigo'] || colorMap.indigo;
+
+                  return (
+                    <div
+                      key={item.id || idx}
+                      className="bg-zinc-950/70 border border-zinc-800/90 hover:border-zinc-700 p-3 rounded-xl transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 text-xs"
+                    >
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Action Type Badge */}
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${styling.bg} ${styling.text} ${styling.border}`}
+                          >
+                            {item.action}
+                          </span>
+
+                          {/* Timestamp */}
+                          <span className="text-[11px] text-zinc-400 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-zinc-500" />
+                            {item.timestamp}
+                          </span>
+
+                          {/* Count or Target Indicator */}
+                          {item.count !== undefined && (
+                            <span className="text-[10px] font-mono bg-zinc-800/80 text-zinc-300 px-1.5 py-0.2 rounded border border-zinc-700/60">
+                              {item.count} Record{item.count === 1 ? '' : 's'}
+                            </span>
+                          )}
+                          {item.targetId && (
+                            <span className="text-[10px] font-mono bg-zinc-800/80 text-indigo-300 px-1.5 py-0.2 rounded border border-zinc-700/60">
+                              ID: {item.targetId}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Details Message */}
+                        <p className="text-zinc-300 text-xs font-normal leading-relaxed">
+                          {item.details}
+                        </p>
+                      </div>
+
+                      {/* User Attribution */}
+                      <div className="shrink-0 flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-lg text-[11px] text-zinc-400 self-start">
+                        <User className="w-3 h-3 text-zinc-500" />
+                        <span className="font-mono text-zinc-300">{item.user}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {logs.length === 0 && (
+                  <div className="p-8 text-center bg-zinc-950/40 border border-zinc-800/70 rounded-xl space-y-2">
+                    <History className="w-8 h-8 text-zinc-600 mx-auto" />
+                    <p className="text-zinc-400 text-xs">No recent activity logs recorded yet.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

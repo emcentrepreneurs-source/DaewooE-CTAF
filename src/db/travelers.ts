@@ -51,6 +51,7 @@ export async function saveTravelers(records: any[], userUid?: string) {
       flights: r.flights || [],
       accommodations: r.accommodation || r.accommodations || [],
       status: r.status || (r.isValid === false ? 'invalid' : 'ready'),
+      source: r.source || 'manual',
       notes: r.notes || null,
       updatedAt: new Date(),
     }));
@@ -86,6 +87,7 @@ export async function saveTravelers(records: any[], userUid?: string) {
             flights: item.flights,
             accommodations: item.accommodations,
             status: item.status,
+            source: item.source,
             notes: item.notes,
             updatedAt: new Date(),
           },

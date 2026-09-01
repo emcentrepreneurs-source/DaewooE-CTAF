@@ -81,8 +81,8 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
   onClose,
   onAddTravelers
 }) => {
-  const [activeTab, setActiveTab] = useState<'camera' | 'upload' | 'samples' | 'docupass'>('camera');
-  const [scanProvider, setScanProvider] = useState<'idanalyzer' | 'gemini'>('idanalyzer');
+  const [activeTab, setActiveTab] = useState<'camera' | 'upload' | 'docupass'>('camera');
+  const [scanProvider, setScanProvider] = useState<'idanalyzer' | 'gemini'>('gemini');
 
   // DocuPass state
   const [docuPassData, setDocuPassData] = useState<{
@@ -151,7 +151,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera access is not supported in this browser environment. Please use Image Upload or Sample Presets.');
+        throw new Error('Camera access is not supported in this browser environment. Please use Image or PDF Upload.');
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -171,7 +171,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
       }
     } catch (err: any) {
       console.warn('Camera stream error:', err);
-      setCameraError(err.message || 'Could not access device camera. Please upload an image file or choose a test preset.');
+      setCameraError(err.message || 'Could not access device camera. Please upload an image or PDF file.');
       setIsCameraActive(false);
     }
   }, [facingMode]);
@@ -225,8 +225,8 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
     setIsScanning(true);
     setScanStepMessage(
       scanProvider === 'idanalyzer'
-        ? 'Scanning with ID Analyzer Global 190+ Engine (< 3s)...'
-        : 'Executing Gemini Multimodal Vision OCR & ICAO Doc 9303...'
+        ? 'Scanning with ID Analyzer Engine (< 3s)...'
+        : 'Executing Gemini Multimodal Vision OCR & Document Verification...'
     );
     setAddedSuccessCount(null);
 
@@ -239,12 +239,35 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
       };
       setExtractedList(prev => [withSource, ...prev]);
       setSelectedResultIndex(0);
-      setScanStepMessage('Document processed and verified with 100% accuracy!');
+      setScanStepMessage('Document processed and verified!');
     } catch (err: any) {
-      console.error('Scan processing error:', err);
-      const fallback = SAMPLE_ID_PRESETS[0].data;
-      setExtractedList(prev => [{ ...fallback, sourceFile: sourceName || 'Optical Scanner', imagePreview: base64Data }, ...prev]);
+      console.warn('Scan processing notice:', err);
+      const emptyEntry: ExtractedIdResult = {
+        surname: '',
+        givenNames: '',
+        nameAndGender: '',
+        passportOrIdNumber: '',
+        dateOfBirth: '',
+        nationality: 'MOZAMBICAN',
+        passportExpiryDate: '',
+        gender: 'MALE',
+        companyId: '30190',
+        company: 'DAEWOO',
+        projectPosition: 'PROJECT SPECIALIST',
+        projectDepartment: 'LOGISTICS',
+        documentType: 'National ID',
+        confidence: 0,
+        sourceFile: sourceName || 'Live Document Capture',
+        imagePreview: base64Data,
+        validationStatus: {
+          isValid: false,
+          warnings: [`OCR notice: ${err.message || 'Automatic text extraction could not read clear text.'} Please review and adjust the fields manually.`],
+          checksPassed: []
+        }
+      };
+      setExtractedList(prev => [emptyEntry, ...prev]);
       setSelectedResultIndex(0);
+      setScanStepMessage('Please review or complete the traveler details manually on the right.');
     } finally {
       setIsScanning(false);
     }
@@ -271,29 +294,38 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
       try {
         const extracted = await scanIdImage(base64, file.type || 'image/jpeg', { provider: scanProvider });
         setExtractedList(prev => [{ ...extracted, sourceFile: file.name, imagePreview: base64 }, ...prev]);
-      } catch (e) {
-        console.warn('Batch file scan fallback:', e);
-        const fallback = SAMPLE_ID_PRESETS[i % SAMPLE_ID_PRESETS.length].data;
-        setExtractedList(prev => [{ ...fallback, sourceFile: file.name, imagePreview: base64 }, ...prev]);
+      } catch (e: any) {
+        console.warn('Batch file scan notice:', e);
+        const blankEntry: ExtractedIdResult = {
+          surname: '',
+          givenNames: '',
+          nameAndGender: '',
+          passportOrIdNumber: '',
+          dateOfBirth: '',
+          nationality: 'MOZAMBICAN',
+          passportExpiryDate: '',
+          gender: 'MALE',
+          companyId: '30190',
+          company: 'DAEWOO',
+          projectPosition: 'PROJECT SPECIALIST',
+          projectDepartment: 'LOGISTICS',
+          documentType: 'National ID',
+          confidence: 0,
+          sourceFile: file.name,
+          imagePreview: base64,
+          validationStatus: {
+            isValid: false,
+            warnings: [`Document text could not be resolved automatically (${e.message || 'unreadable'}). Please enter details manually.`],
+            checksPassed: []
+          }
+        };
+        setExtractedList(prev => [blankEntry, ...prev]);
       }
     }
 
     setSelectedResultIndex(0);
     setIsScanning(false);
-    setScanStepMessage('All documents processed and validated!');
-  };
-
-  // Load Preset Sample
-  const handleSelectPreset = (preset: typeof SAMPLE_ID_PRESETS[0]) => {
-    setExtractedList(prev => [
-      {
-        ...preset.data,
-        sourceFile: preset.name,
-      },
-      ...prev
-    ]);
-    setSelectedResultIndex(0);
-    setAddedSuccessCount(null);
+    setScanStepMessage('All documents processed. Please verify fields before assigning flights.');
   };
 
   // Current active result
@@ -388,11 +420,11 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
                 </h3>
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                  ICAO Doc 9303 Compliant
+                  Verified ID & Passport
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                   <Clock className="w-3 h-3 text-indigo-400" />
-                  Sub-3s Engine (190+ Countries)
+                  Fast Verification Engine
                 </span>
               </div>
               <p className="text-xs text-zinc-400">
@@ -412,10 +444,10 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
-                title="Global Provider: ID Analyzer (190+ Countries, Sub-3s SLA)"
+                title="ID Analyzer Verification Engine"
               >
                 <Zap className="w-3 h-3 text-amber-300" />
-                <span>ID Analyzer Global</span>
+                <span>ID Analyzer</span>
               </button>
               <button
                 type="button"
@@ -468,18 +500,6 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('samples')}
-            className={`pb-2.5 font-semibold px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === 'samples'
-                ? 'border-indigo-500 text-indigo-400'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <Zap className="w-4 h-4" />
-            <span>Official Presets (190+ Countries)</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('docupass')}
             className={`pb-2.5 font-semibold px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'docupass'
@@ -495,7 +515,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
         {/* Modal Main Body Grid */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-5">
           
-          {/* LEFT COLUMN: Document Viewfinder / Upload / Preset Library (5.5 cols) */}
+          {/* LEFT COLUMN: Document Viewfinder / Upload / Mobile Flow (5.5 cols) */}
           <div className="lg:col-span-6 flex flex-col gap-3.5">
             {activeTab === 'camera' && (
               <div className="flex flex-col gap-3">
@@ -632,46 +652,6 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
               </div>
             )}
 
-            {activeTab === 'samples' && (
-              <div className="flex flex-col gap-2.5">
-                <p className="text-xs text-zinc-400">
-                  Select a verified document preset to test zero-mistake ICAO 9303 extraction:
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[320px] overflow-y-auto pr-1">
-                  {SAMPLE_ID_PRESETS.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSelectPreset(preset)}
-                      className="p-3 bg-zinc-950/80 hover:bg-indigo-950/40 border border-zinc-800 hover:border-indigo-500/60 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[9px] font-bold uppercase tracking-wider bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                            {preset.type}
-                          </span>
-                          <span className="text-[10px] text-zinc-500 font-mono">
-                            {preset.data.passportOrIdNumber}
-                          </span>
-                        </div>
-                        <h5 className="font-bold text-xs text-zinc-100 group-hover:text-indigo-300 transition-colors">
-                          {preset.name}
-                        </h5>
-                        <p className="text-[10.5px] text-zinc-400 mt-0.5 line-clamp-1">
-                          {preset.description}
-                        </p>
-                      </div>
-                      <div className="mt-2.5 pt-2 border-t border-zinc-800/80 flex items-center justify-between text-[10px] text-zinc-500">
-                        <span className="font-semibold text-zinc-300">{preset.data.projectPosition}</span>
-                        <span className="text-indigo-400 font-semibold flex items-center gap-1">
-                          Load Preset <ArrowRight className="w-3 h-3" />
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {activeTab === 'docupass' && (
               <div className="flex flex-col gap-3">
                 <div className="bg-zinc-950/90 border border-zinc-800 rounded-2xl p-4 sm:p-5 flex flex-col items-center text-center">
@@ -681,7 +661,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
                       ID Analyzer DocuPass™ Mobile Flow
                     </span>
                     <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-                      190+ Countries • &lt; 3s
+                      Instant Mobile Verification
                     </span>
                   </div>
 
@@ -896,7 +876,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
                     <User className="w-6 h-6" />
                   </div>
                   <p className="text-xs max-w-xs">
-                    No document scanned yet. Point your camera at a passport or ID card, upload a file, or click an official preset on the left.
+                    No document scanned yet. Point your camera at a passport or ID card, or upload a photo or PDF file.
                   </p>
                 </div>
               ) : (
@@ -923,7 +903,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
                     <div className="bg-emerald-950/40 border border-emerald-800/50 p-2 rounded-xl flex items-center justify-between text-[11px] text-emerald-300">
                       <div className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="font-semibold">ICAO Doc 9303 MRZ Checksum Validated</span>
+                        <span className="font-semibold">Machine-Readable Zone (MRZ) Validated</span>
                       </div>
                       <span className="font-mono text-[10px] text-emerald-400/80">{currentResult.mrz.mrzType || 'TD3'}</span>
                     </div>

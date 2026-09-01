@@ -40,6 +40,7 @@ export const travelers = pgTable('travelers', {
   flights: jsonb('flights').$type<any[]>(),
   accommodations: jsonb('accommodations').$type<any[]>(),
   status: text('status').default('ready'),
+  source: text('source').default('manual'), // 'excel' | 'scanner' | 'manual'
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

@@ -350,10 +350,13 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Section 1: Personal Info */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-indigo-400" />
-              1. Personal & Company Information
-            </h4>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-indigo-400" />
+                1. Personal & Company Information
+              </h4>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <div>
                 <label className="block text-[11px] font-medium text-zinc-400 mb-1">

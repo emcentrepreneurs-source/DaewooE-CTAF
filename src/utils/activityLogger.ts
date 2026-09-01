@@ -176,3 +176,16 @@ export function createActivityLog(
     badgeColor: extra?.badgeColor || determineActionBadgeColor(action)
   };
 }
+
+export function recordActivityLog(
+  action: ActivityActionType | string,
+  details: string,
+  user: string = 'ericstamarais@gmail.com',
+  extra?: { targetId?: string; count?: number; badgeColor?: ActivityLogItem['badgeColor'] }
+): ActivityLogItem[] {
+  const currentLogs = getStoredActivityLogs();
+  const newLog = createActivityLog(action, details, user, extra);
+  const updatedLogs = [newLog, ...currentLogs.filter(l => l.id !== newLog.id)].slice(0, 50);
+  saveStoredActivityLogs(updatedLogs);
+  return updatedLogs;
+}

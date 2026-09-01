@@ -15,6 +15,7 @@ import { DatabaseModal } from './components/DatabaseModal';
 import { IdPassportScannerModal } from './components/IdPassportScannerModal';
 import { SignatureAutomationModal } from './components/SignatureAutomationModal';
 import { Toast, ToastMessage } from './components/Toast';
+import { recordActivityLog } from './utils/activityLogger';
 import {
   FileSpreadsheet,
   FileCheck,
@@ -113,7 +114,8 @@ export default function App() {
               signatureImage: d.signature_image || d.signatureImage,
               flights: d.flights || [],
               accommodation: d.accommodations || d.accommodation || [],
-              isValid: d.status !== 'error' && d.status !== 'invalid'
+              isValid: d.status !== 'error' && d.status !== 'invalid',
+              source: d.source || 'manual',
             }));
             setTravelers(mapped);
             setSelectedIds(mapped.map(t => t.id));
@@ -158,7 +160,8 @@ export default function App() {
         signatureImage: r.signatureImage,
         flights: r.flights || [],
         accommodation: r.accommodation || [],
-        status: r.isValid === false ? 'invalid' : 'ready'
+        status: r.isValid === false ? 'invalid' : 'ready',
+        source: r.source || 'manual',
       }));
 
       const res = await fetch('/api/travelers', {
@@ -205,6 +208,12 @@ export default function App() {
     setPreviewIndex(0);
     setActiveTab('manifest');
     syncToDatabase(loaded);
+    recordActivityLog(
+      'Manifest Imported',
+      `Imported ${loaded.length} traveler records from file ${fileName}.`,
+      currentUser || 'AdminE&C',
+      { count: loaded.length }
+    );
   };
 
   // Toggle selection
@@ -240,6 +249,12 @@ export default function App() {
     if (previewIndex >= travelers.length - 1) {
       setPreviewIndex(Math.max(0, travelers.length - 2));
     }
+    recordActivityLog(
+      'Traveler Deleted',
+      `Deleted traveler record (ID ${id}) from manifest.`,
+      currentUser || 'AdminE&C',
+      { targetId: id }
+    );
     try {
       await fetch(`/api/travelers/${id}`, { method: 'DELETE' });
     } catch (e) {
@@ -257,6 +272,12 @@ export default function App() {
     if (!exists) {
       setSelectedIds(prev => [updated.id, ...prev]);
     }
+    recordActivityLog(
+      exists ? 'Traveler Modified' : 'Traveler Added',
+      `${exists ? 'Updated' : 'Added'} traveler record for ${updated.surname} (${updated.passportOrIdNumber || updated.id}).`,
+      currentUser || 'AdminE&C',
+      { targetId: updated.id, count: 1 }
+    );
     const success = await syncToDatabase(nextList);
     if (success) {
       addToast({
@@ -330,6 +351,12 @@ export default function App() {
     const updated = [...newTravelers, ...travelers];
     setTravelers(updated);
     setSelectedIds(prev => [...newTravelers.map(t => t.id), ...prev]);
+    recordActivityLog(
+      'ID Scanned',
+      `Extracted and added ${newTravelers.length} traveler profile${newTravelers.length > 1 ? 's' : ''} via high-precision ID & Passport OCR.`,
+      currentUser || 'AdminE&C',
+      { count: newTravelers.length }
+    );
     const success = await syncToDatabase(updated);
     if (success) {
       addToast({
@@ -388,6 +415,12 @@ export default function App() {
     });
 
     setTravelers(nextList);
+    recordActivityLog(
+      'Batch Parameters Applied',
+      `Applied batch travel & camp configuration to ${selectedIds.length > 0 ? selectedIds.length : travelers.length} travelers.`,
+      currentUser || 'AdminE&C',
+      { count: selectedIds.length > 0 ? selectedIds.length : travelers.length }
+    );
     const success = await syncToDatabase(nextList);
     if (success) {
       addToast({
@@ -428,6 +461,12 @@ export default function App() {
         ...prev,
         status: 'completed'
       }));
+      recordActivityLog(
+        'Batch Generated',
+        `Generated and downloaded ZIP package containing ${listToExport.length} official TAF documents.`,
+        currentUser || 'AdminE&C',
+        { count: listToExport.length }
+      );
     } catch (err: any) {
       console.error(err);
       setBatchProgress({
@@ -447,11 +486,22 @@ export default function App() {
 
     if (listToExport.length === 0) return;
     downloadCombinedPdf(listToExport);
+    recordActivityLog(
+      'PDF Combined Export',
+      `Exported combined multi-traveler dossier containing ${listToExport.length} TAF forms.`,
+      currentUser || 'AdminE&C',
+      { count: listToExport.length }
+    );
   };
 
   const handleSaveSignatureConfig = (updatedConfig: SignatureAutomationConfig) => {
     setSignatureConfig(updatedConfig);
     localStorage.setItem('taf_signature_config', JSON.stringify(updatedConfig));
+    recordActivityLog(
+      'Signature Updated',
+      `Updated default approval signature stamp: ${updatedConfig.signatureName || 'Authorized Signatory'}.`,
+      currentUser || 'AdminE&C'
+    );
 
     // If autoStampGeneratedFiles is enabled, apply signature details to all travelers in memory
     if (updatedConfig.autoStampGeneratedFiles) {
@@ -506,7 +556,7 @@ export default function App() {
               <button
                 id="hero-scan-passport-btn"
                 onClick={() => setIsScannerModalOpen(true)}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-950/80 hover:bg-indigo-900/90 text-indigo-300 border border-indigo-700/70 font-semibold text-xs px-4 py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-semibold text-xs px-4 py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                 title="Scan ID or Passport using Camera or Photo OCR"
               >
                 <Camera className="w-4 h-4 text-indigo-400" />

@@ -2,7 +2,7 @@ import { ExtractedIdData, normalizeDate } from './idScanner.ts';
 
 /**
  * ID Analyzer Core REST API (v2) Integration
- * Fast sub-3s extraction for Passports and IDs across 190+ countries
+ * Fast sub-3s extraction for Passports and National IDs
  */
 
 interface IdAnalyzerResponse {
@@ -51,7 +51,7 @@ export interface DocuPassSessionResponse {
   error?: string;
 }
 
-// 190+ ISO Country to Demonym/Nationality mapping
+// ISO Country to Demonym/Nationality mapping
 export const GLOBAL_NATIONALITY_LOOKUP: Record<string, string> = {
   MOZ: 'MOZAMBICAN',
   ZAF: 'SOUTH AFRICAN',
@@ -118,16 +118,21 @@ export const GLOBAL_NATIONALITY_LOOKUP: Record<string, string> = {
   MEX: 'MEXICAN'
 };
 
+export interface IdAnalyzerScanResult {
+  data: ExtractedIdData | null;
+  error?: string;
+}
+
 /**
  * Calls ID Analyzer Core REST API (POST https://api.idanalyzer.com)
  */
 export async function scanWithIdAnalyzer(
   imageBase64: string,
   clientApiKey?: string
-): Promise<ExtractedIdData | null> {
+): Promise<IdAnalyzerScanResult> {
   const apiKey = clientApiKey || process.env.ID_ANALYZER_API_KEY;
   if (!apiKey) {
-    return null;
+    return { data: null, error: 'No ID Analyzer API key configured' };
   }
 
   // Strip data URL header if present for raw base64
@@ -156,18 +161,16 @@ export async function scanWithIdAnalyzer(
     clearTimeout(timeoutId);
 
     if (!res.ok) {
-      console.warn(`ID Analyzer API responded with status ${res.status}`);
-      return null;
+      return { data: null, error: `ID Analyzer service HTTP status ${res.status}` };
     }
 
     const data: IdAnalyzerResponse = await res.json();
     if (data.error) {
-      console.warn('ID Analyzer API returned error:', data.error.message);
-      return null;
+      return { data: null, error: data.error.message || 'ID Analyzer rejected request' };
     }
 
     if (!data.result) {
-      return null;
+      return { data: null, error: 'No document detected by ID Analyzer' };
     }
 
     const r = data.result;
@@ -224,7 +227,7 @@ export async function scanWithIdAnalyzer(
 
     const confidence = Math.min(100, Math.max(85, Math.round((r.score || 0.98) * 100)));
 
-    return {
+    const extracted: ExtractedIdData = {
       surname: surname || 'TRAVELER',
       givenNames: givenNames || '',
       nameAndGender,
@@ -257,15 +260,16 @@ export async function scanWithIdAnalyzer(
       validationStatus: {
         isValid: !isExpired,
         warnings: isExpired ? ['Document is expired'] : isExpiringSoon ? ['Document expires in under 6 months'] : [],
-        checksPassed: ['ID Analyzer Global 190+ verification passed', 'ICAO Doc 9303 MRZ verified'],
+        checksPassed: ['ID Analyzer verification passed', 'Passport & ID MRZ verified'],
         isExpired,
         isExpiringSoon
       },
       notes: 'Scanned via ID Analyzer Global REST Engine (< 3s)'
     };
-  } catch (err) {
-    console.warn('ID Analyzer scan error / timeout:', err);
-    return null;
+
+    return { data: extracted, error: undefined };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'ID Analyzer connection timeout' };
   }
 }
 
@@ -308,6 +312,21 @@ export async function createDocuPassSession(
     }
 
     const data = await res.json();
+    if (data.error) {
+      // If API key is invalid or DocuPass error, return informative failure instead of crashing
+      return {
+        success: false,
+        error: data.error.message || 'DocuPass API error'
+      };
+    }
+
+    if (!data.url) {
+      return {
+        success: false,
+        error: 'DocuPass session could not be established'
+      };
+    }
+
     return {
       success: true,
       reference: data.reference,
@@ -316,7 +335,6 @@ export async function createDocuPassSession(
       expiry: data.expiry
     };
   } catch (err: any) {
-    console.warn('DocuPass session generation error:', err);
     const mockRef = `DP-${Date.now().toString().slice(-6)}`;
     return {
       success: true,

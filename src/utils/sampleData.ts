@@ -102,7 +102,7 @@ export const SAMPLE_TRAVELERS: TravelerRecord[] = [
     passportOrIdNumber: '080319854711M',
     dateOfBirth: '18-Jul-85',
     nationality: 'MOZAMBICAN',
-    passportExpiryDate: '10-Oct-32',
+    passportExpiryDate: '15-Sep-26',
     flights: [
       {
         date: '8/9/2026',
@@ -266,7 +266,7 @@ export const SAMPLE_TRAVELERS: TravelerRecord[] = [
     passportOrIdNumber: '040519912844S',
     dateOfBirth: '14-Feb-91',
     nationality: 'MOZAMBICAN',
-    passportExpiryDate: '28-Sep-32',
+    passportExpiryDate: '',
     flights: [
       {
         date: '8/9/2026',
@@ -433,7 +433,7 @@ export const SAMPLE_TRAVELERS: TravelerRecord[] = [
     passportExpiryDate: '27-Oct-32',
     flights: [
       {
-        date: '8/9/2026',
+        date: '',
         from: 'PEMBA',
         to: 'AFUNGI',
         departureTime: '06:45',

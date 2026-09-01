@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, ShieldCheck, Sparkles, Building2, UserCheck, LogOut, Database, RefreshCw, FileSignature, Code2 } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, Sparkles, Building2, UserCheck, LogOut, RefreshCw, FileSignature, Code2 } from 'lucide-react';
 import { CCS_JV_LOGO_BASE64 } from '../assets/logo';
 
 interface HeaderProps {
@@ -78,17 +78,17 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Info Badges & User Profile */}
-        <div className="hidden md:flex items-center gap-3 text-xs">
+        <div className="hidden md:flex items-center gap-2.5 text-xs">
           {/* Signature & Automation Code Hub Button */}
           {onOpenSignatureModal && (
             <button
               id="header-signature-automation-btn"
               onClick={onOpenSignatureModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-950/70 hover:bg-indigo-900 text-indigo-200 hover:text-white border border-indigo-700/70 hover:border-indigo-500 rounded-lg transition-all font-medium cursor-pointer shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 rounded-lg transition-all font-medium cursor-pointer shadow-sm"
               title="Configure automated signature appending and view Python & Google Docs API scripts"
             >
               <FileSignature className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Signature & Automation Scripts</span>
+              <span>Signatures</span>
             </button>
           )}
 

@@ -173,9 +173,9 @@ export function normalizeDate(raw: string, isExpiry: boolean = false): string {
 }
 
 /**
- * Calculates check digits according to ICAO Doc 9303
+ * Calculates check digits according to standard machine-readable passport specifications
  */
-export function verifyIcaoCheckDigit(data: string, checkDigit: string): boolean {
+export function verifyPassportCheckDigit(data: string, checkDigit: string): boolean {
   if (!data || !checkDigit) return false;
   const weights = [7, 3, 1];
   let sum = 0;
@@ -193,6 +193,8 @@ export function verifyIcaoCheckDigit(data: string, checkDigit: string): boolean 
   }
   return (sum % 10).toString() === checkDigit;
 }
+
+export const verifyIcaoCheckDigit = verifyPassportCheckDigit;
 
 /**
  * Cleans and formats passport/ID numbers
@@ -215,7 +217,7 @@ export function cleanPassportOrIdNumber(raw: string, country?: string): string {
 }
 
 /**
- * Scans an ID or Passport image data buffer/base64 using ID Analyzer REST API or Gemini Multimodal Vision API with Zero-Mistake ICAO 9303 Logic
+ * Scans an ID or Passport image data buffer/base64 using ID Analyzer REST API or Gemini Multimodal Vision API with high-precision document verification
  */
 export async function scanIdOrPassport(
   base64Image: string,
@@ -226,17 +228,21 @@ export async function scanIdOrPassport(
   }
 ): Promise<ExtractedIdData> {
   const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '').trim();
+  let idAnalyzerNotice: string | null = null;
   
   // 1. If ID Analyzer is explicitly selected or ID_ANALYZER_API_KEY is available and provider is auto/idanalyzer
   const preferIdAnalyzer = options?.provider === 'idanalyzer' || (options?.provider !== 'gemini' && !!process.env.ID_ANALYZER_API_KEY);
   if (preferIdAnalyzer) {
     try {
-      const idAnalyzerResult = await scanWithIdAnalyzer(cleanBase64, options?.idAnalyzerKey);
-      if (idAnalyzerResult) {
-        return idAnalyzerResult;
+      const analyzerResult = await scanWithIdAnalyzer(cleanBase64, options?.idAnalyzerKey);
+      if (analyzerResult.data) {
+        return analyzerResult.data;
       }
-    } catch (err) {
-      console.warn('ID Analyzer failed, falling back to Gemini Vision OCR:', err);
+      if (analyzerResult.error) {
+        idAnalyzerNotice = analyzerResult.error;
+      }
+    } catch (err: any) {
+      idAnalyzerNotice = err?.message || 'Connection error';
     }
   }
 
@@ -245,7 +251,7 @@ export async function scanIdOrPassport(
 
   if (ai) {
     try {
-      const prompt = `You are a certified professional ICAO Doc 9303 and National Identity document OCR inspection system for the Mozambique LNG / CCS JV project (Daewoo E&C, Saipem, TotalEnergies).
+      const prompt = `You are a certified professional Passport and National Identity document OCR inspection system for the Mozambique LNG / CCS JV project (Daewoo E&C, Saipem, TotalEnergies).
 
 TASK:
 Examine the provided image of a Passport, Mozambique National ID (Bilhete de Identidade / BI), Cartão de Residente (DIRE), Driving License, or Site Badge.
@@ -321,11 +327,11 @@ Return a JSON object conforming strictly to this structure:
   "company": "DAEWOO",
   "projectPosition": "RIGGING FOREMAN",
   "projectDepartment": "CONSTRUCTION",
-  "notes": "Verified against ICAO 9303 MRZ checksum specifications"
+  "notes": "Verified against standard passport MRZ checksum specifications"
 }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
+        model: 'gemini-3.6-flash',
         contents: [
           {
             role: 'user',
@@ -347,7 +353,7 @@ Return a JSON object conforming strictly to this structure:
         },
       });
 
-      const responseText = response.text || '';
+      const responseText = (response.text || '').replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
       const parsed = JSON.parse(responseText);
 
       const surname = (parsed.surname || 'TRAVELER').toUpperCase().trim();
@@ -375,8 +381,12 @@ Return a JSON object conforming strictly to this structure:
       const warnings: string[] = [];
       const checksPassed: string[] = [];
 
+      if (idAnalyzerNotice) {
+        warnings.unshift(`Note: ID Analyzer API key was rejected ("${idAnalyzerNotice}"). Extracted using Google Gemini Multimodal Vision AI.`);
+      }
+
       if (parsed.mrz?.hasMrz) {
-        checksPassed.push('ICAO Doc 9303 Machine Readable Zone (MRZ) verified');
+        checksPassed.push('Machine Readable Zone (MRZ) checksum verified');
       } else {
         warnings.push('Visual Zone extraction; MRZ not detected or obstructed');
       }
@@ -460,12 +470,41 @@ Return a JSON object conforming strictly to this structure:
         notes: parsed.notes || 'Biometric & Optical MRZ Extraction Engine Verified',
       };
     } catch (err: any) {
-      console.warn('Gemini vision API OCR scan failed, falling back to heuristic OCR:', err.message);
+      console.warn('Gemini vision API OCR scan notice:', err.message);
     }
   }
 
-  // Fallback Heuristic Generator for offline / test environments
-  return generateHeuristicScanResult(cleanBase64);
+  // If both engines could not resolve the image, return a clean blank template with instructions
+  return {
+    surname: '',
+    givenNames: '',
+    nameAndGender: '',
+    passportOrIdNumber: '',
+    dateOfBirth: '',
+    nationality: 'MOZAMBICAN',
+    nationalityCode: 'MOZ',
+    passportExpiryDate: '',
+    gender: 'MALE',
+    companyId: '30190',
+    company: 'DAEWOO',
+    projectPosition: 'PROJECT SPECIALIST',
+    projectDepartment: 'LOGISTICS',
+    documentType: 'National ID',
+    confidence: 0,
+    mrz: { hasMrz: false, rawLines: [] },
+    validationStatus: {
+      isValid: false,
+      warnings: [
+        idAnalyzerNotice
+          ? `Notice: ID Analyzer reported ("${idAnalyzerNotice}"). Image text could not be resolved automatically. Please ensure good lighting and focus, or enter traveler details manually on the right.`
+          : 'Could not resolve clear text from this document image. Please ensure steady focus and lighting, or enter details manually on the right.'
+      ],
+      checksPassed: [],
+      isExpiringSoon: false,
+      isExpired: false,
+    },
+    notes: 'Manual entry required: document image unreadable by OCR',
+  };
 }
 
 /**
@@ -583,7 +622,7 @@ export function generateHeuristicScanResult(cleanBase64: string): ExtractedIdDat
       warnings: [],
       checksPassed: [
         'High-resolution document optical zone extracted',
-        'ICAO Doc 9303 checksum verified',
+        'Passport machine-readable zone checksum verified',
         'Validity complies with 6-month international standard',
       ],
       isExpiringSoon: false,

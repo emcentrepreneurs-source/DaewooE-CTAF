@@ -61,6 +61,7 @@ export interface TravelerRecord {
   // Validation status
   isValid?: boolean;
   validationErrors?: string[];
+  source?: 'excel' | 'scanner' | 'manual';
 }
 
 export interface ColumnMapping {

@@ -61,7 +61,7 @@ export const SAMPLE_ID_PRESETS: Array<{
     type: 'Passport',
     nationality: 'MOZAMBICAN',
     badgeColor: 'emerald',
-    description: 'Official TD3 ICAO MRZ Passport for CCS JV Afungi Site Rigging Foreman',
+    description: 'Official Standard Passport for CCS JV Afungi Site Rigging Foreman',
     data: {
       surname: 'CHALE',
       givenNames: 'ARMANDO SEBASTIAO',
@@ -101,14 +101,14 @@ export const SAMPLE_ID_PRESETS: Array<{
         isValid: true,
         warnings: [],
         checksPassed: [
-          'ICAO Doc 9303 MRZ verified with 100% check digit integrity',
+          'Passport machine-readable zone verified with 100% check digit integrity',
           'Passport validity extends beyond 6 months (Expires Nov 2031)',
           'High biometric match and character segregation'
         ],
         isExpiringSoon: false,
         isExpired: false
       },
-      notes: 'MRZ TD3 ICAO Compliant & Verified'
+      notes: 'Machine-Readable Zone (MRZ) Verified'
     }
   },
   {
@@ -378,14 +378,14 @@ export const SAMPLE_ID_PRESETS: Array<{
         isValid: true,
         warnings: [],
         checksPassed: [
-          'RSA Department of Home Affairs ICAO format verified',
+          'RSA Department of Home Affairs format verified',
           'MRZ TD3 Checksum passed',
           'Valid for international transit'
         ],
         isExpiringSoon: false,
         isExpired: false
       },
-      notes: 'Scanned via ID Analyzer Global 190+ Engine (1.2s)'
+      notes: 'Scanned via ID Analyzer Engine (1.2s)'
     }
   },
   {
@@ -532,16 +532,12 @@ export async function scanIdImage(
         };
       }
     }
-  } catch (err) {
-    console.warn('Network error reaching /api/scan-id, using client-side fallback:', err);
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `Server returned status ${res.status}`);
+  } catch (err: any) {
+    console.warn('Error reaching /api/scan-id:', err);
+    throw err;
   }
-
-  // Client-side instant fallback
-  const fallback = SAMPLE_ID_PRESETS[0].data;
-  return {
-    ...fallback,
-    imagePreview: imageDataBase64.startsWith('data:') ? imageDataBase64 : `data:${mimeType};base64,${imageDataBase64}`
-  };
 }
 
 /**
