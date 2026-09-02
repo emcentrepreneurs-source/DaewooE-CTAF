@@ -615,7 +615,7 @@ export function convertExtractedIdToTravelerRecord(
     projectDepartment: extracted.projectDepartment || 'LOGISTICS',
 
     mobileNumber: '+258 84 000 0000',
-    emailAddress: `${surname.toLowerCase()}.${(givenNames.split(' ')[0] || 'staff').toLowerCase()}@ccsjv.com`,
+    emailAddress: 'DEC.TravelMZ@daewooenc.com',
     substituteInAbsence: 'Duty Supervisor / Site Lead',
     frequentFlyerCard: 'N/A',
 

@@ -312,7 +312,7 @@ export default function App() {
       projectPosition: 'SITE SPECIALIST',
       projectDepartment: 'CONSTRUCTION',
       mobileNumber: '+258 84 000 0000',
-      emailAddress: 'traveler@ccsjv.com',
+      emailAddress: 'DEC.TravelMZ@daewooenc.com',
       substituteInAbsence: 'N/A',
       frequentFlyerCard: 'N/A',
       passportOrIdNumber: '1100' + Math.floor(1000 + Math.random() * 9000),

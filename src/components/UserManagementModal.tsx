@@ -343,7 +343,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                       required
                       value={newEmail}
                       onChange={e => setNewEmail(e.target.value)}
-                      placeholder="e.g. eric.matola@ccsjv.com"
+                      placeholder="e.g. DEC.TravelMZ@daewooenc.com"
                       className="w-full pl-9 pr-3 py-2 bg-zinc-900 border border-zinc-700/80 rounded-lg text-zinc-100 placeholder-zinc-500 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>

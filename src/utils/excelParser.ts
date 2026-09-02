@@ -240,7 +240,7 @@ export function parseExcelFile(data: ArrayBuffer | Uint8Array): {
       projectPosition: projectPosition.toUpperCase(),
       projectDepartment: projectDepartment.toUpperCase(),
       mobileNumber,
-      emailAddress: emailAddress || 'daewoo.travelmz@daewooenc.com',
+      emailAddress: emailAddress || 'DEC.TravelMZ@daewooenc.com',
       substituteInAbsence,
       frequentFlyerCard,
       passportOrIdNumber,

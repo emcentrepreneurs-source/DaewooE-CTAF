@@ -9,6 +9,8 @@ import {
 } from '../utils/dateTimeValidation';
 import { DrumWheelPickerModal } from './DrumWheelPickerModal';
 import { DrumPickerTriggerButton } from './DrumPickerTriggerButton';
+import { RotationPurposeSelector } from './RotationPurposeSelector';
+import { normalizeRotationOrPurpose } from '../utils/rotationPurposeOptions';
 
 interface BatchSettingsModalProps {
   isOpen: boolean;
@@ -62,7 +64,7 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
   // Scroll Wheel / Drum Picker modal state
   const [drumPickerState, setDrumPickerState] = useState<{
     isOpen: boolean;
-    mode: 'date' | 'time';
+    mode: 'date' | 'time' | 'rotation' | 'purpose';
     title: string;
     initialValue: string;
     dateFormat?: 'dob' | 'short' | 'full' | 'iso';
@@ -107,6 +109,26 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
       context: 'time',
       onConfirm
     });
+  };
+
+  const openDrumRotationPicker = (
+    title: string,
+    initialValue: string,
+    onConfirm: (val: string) => void
+  ) => {
+    setDrumPickerState({
+      isOpen: true,
+      mode: 'rotation',
+      title,
+      initialValue: initialValue || 'Mobilization',
+      onConfirm
+    });
+  };
+
+  const handleRotationOrPurposeChange = (val: PurposeOfTrip | string) => {
+    const normalized = normalizeRotationOrPurpose(val);
+    setRotationType(normalized);
+    setPurposeOfTrip(normalized);
   };
 
   // Checkbox toggles for what to apply
@@ -484,6 +506,63 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
                     onChange={e => setSignatureName(e.target.value)}
                     className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg font-mono focus:ring-2 focus:ring-indigo-500"
                     placeholder="e.g. Eric Matola"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Rotation Type & Purpose of Trip Batch Section */}
+          <div className="p-4 rounded-xl border border-zinc-800/90 bg-zinc-950/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-xs font-semibold text-zinc-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={applyRotation}
+                  onChange={e => setApplyRotation(e.target.checked)}
+                  className="rounded accent-indigo-500 focus:ring-indigo-500"
+                />
+                Apply Rotation Type, Purpose of Trip & Destination
+              </label>
+            </div>
+
+            {applyRotation && (
+              <div className="space-y-3 pt-2">
+                <div>
+                  <label className="block text-[10px] font-medium text-zinc-400 mb-1">
+                    FINAL DESTINATION
+                  </label>
+                  <input
+                    type="text"
+                    value={finalDestination}
+                    onChange={e => setFinalDestination(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="e.g. Afungi / Pemba / Maputo"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-medium text-zinc-300">
+                      ROTATION TYPE & PURPOSE OF TRIP (CHOOSE FROM 5)
+                    </label>
+                    <span className="text-[9px] text-zinc-500">
+                      Scroll mouse wheel up/down to select
+                    </span>
+                  </div>
+
+                  <RotationPurposeSelector
+                    id="batch-rotation-purpose-selector"
+                    value={rotationType || purposeOfTrip}
+                    onChange={handleRotationOrPurposeChange}
+                    onOpenDrumWheel={() =>
+                      openDrumRotationPicker(
+                        'Batch: Select Rotation Type / Purpose of Trip',
+                        rotationType || purposeOfTrip,
+                        val => handleRotationOrPurposeChange(val)
+                      )
+                    }
+                    showChips={true}
                   />
                 </div>
               </div>

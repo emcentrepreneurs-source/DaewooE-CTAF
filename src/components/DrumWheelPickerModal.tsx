@@ -17,8 +17,13 @@ import {
   parseFlexibleTime,
   formatTo24HourTime
 } from '../utils/dateTimeValidation';
+import {
+  ROTATION_PURPOSE_OPTIONS,
+  normalizeRotationOrPurpose,
+  PurposeOfTrip
+} from '../utils/rotationPurposeOptions';
 
-export type DrumPickerMode = 'date' | 'time';
+export type DrumPickerMode = 'date' | 'time' | 'rotation' | 'purpose';
 export type DateFormatTarget = 'dob' | 'short' | 'full' | 'iso';
 
 interface DrumWheelPickerModalProps {
@@ -74,6 +79,19 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
 
   const [selectedHour, setSelectedHour] = useState<number>(initialParsedTime.hour);
   const [selectedMinute, setSelectedMinute] = useState<number>(initialParsedTime.minute);
+
+  // ------------------ ROTATION / PURPOSE STATE ------------------
+  const [selectedRotation, setSelectedRotation] = useState<PurposeOfTrip>(() => {
+    return normalizeRotationOrPurpose(initialValue);
+  });
+
+  const rotationOptions: DrumOption[] = useMemo(() => {
+    return ROTATION_PURPOSE_OPTIONS.map(opt => ({
+      value: opt.value,
+      label: opt.label,
+      sublabel: `[${opt.tag}] ${opt.sublabel}`
+    }));
+  }, []);
 
   // ------------------ DATE OPTIONS GENERATION ------------------
   // Years range: 1940 to 2045
@@ -144,8 +162,10 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
   const handleConfirm = () => {
     if (mode === 'date') {
       onConfirm(formattedPreview);
-    } else {
+    } else if (mode === 'time') {
       onConfirm(formattedTimePreview);
+    } else {
+      onConfirm(selectedRotation);
     }
     onClose();
   };
@@ -176,15 +196,19 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
         setSelectedMonth(d.getMonth());
         setSelectedDay(d.getDate());
         setSelectedFormat(dateFormat);
-      } else {
+      } else if (mode === 'time') {
         const t = parseFlexibleTime(initialValue) || { hour: 6, minute: 45 };
         setSelectedHour(t.hour);
         setSelectedMinute(t.minute);
+      } else {
+        setSelectedRotation(normalizeRotationOrPurpose(initialValue));
       }
     }
   }, [isOpen, initialValue, mode, dateFormat]);
 
   if (!isOpen) return null;
+
+  const activeRotationMeta = ROTATION_PURPOSE_OPTIONS.find(opt => opt.value === selectedRotation) || ROTATION_PURPOSE_OPTIONS[0];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -200,10 +224,10 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-1.5">
-                {title || (mode === 'date' ? 'Scroll Wheel Date Picker' : 'Scroll Wheel Time Picker')}
+                {title || (mode === 'date' ? 'Scroll Wheel Date Picker' : mode === 'time' ? 'Scroll Wheel Time Picker' : 'Scroll Wheel Rotation & Trip Purpose')}
               </h3>
               <p className="text-[11px] text-zinc-400">
-                Drag or scroll each cylinder wheel to select
+                Drag or scroll cylinder wheel to select from the 5 options
               </p>
             </div>
           </div>
@@ -222,13 +246,15 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
             <div className="flex items-center gap-2">
               {mode === 'date' ? (
                 <Calendar className="w-4 h-4 text-indigo-400" />
-              ) : (
+              ) : mode === 'time' ? (
                 <Clock className="w-4 h-4 text-indigo-400" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-indigo-400" />
               )}
               <span className="text-xs text-zinc-400">Current Selection:</span>
             </div>
             <div className="font-mono text-base font-bold text-indigo-200 tracking-wider">
-              {mode === 'date' ? formattedPreview : formattedTimePreview}
+              {mode === 'date' ? formattedPreview : mode === 'time' ? formattedTimePreview : selectedRotation}
             </div>
           </div>
         </div>
@@ -353,6 +379,25 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
               </button>
             </>
           )}
+
+          {(mode === 'rotation' || mode === 'purpose') && (
+            <>
+              {ROTATION_PURPOSE_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSelectedRotation(opt.value)}
+                  className={`px-2 py-1 rounded-md border whitespace-nowrap transition-colors cursor-pointer font-sans ${
+                    selectedRotation === opt.value
+                      ? 'bg-indigo-600 text-white border-indigo-400 font-semibold'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </>
+          )}
         </div>
 
         {/* DRUM WHEELS DISPLAY */}
@@ -392,7 +437,7 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
                 itemHeight={42}
               />
             </div>
-          ) : (
+          ) : mode === 'time' ? (
             <div className="grid grid-cols-2 gap-4 max-w-xs mx-auto">
               {/* Hours Wheel */}
               <DrumWheelColumn
@@ -414,6 +459,19 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
                 onSelect={val => setSelectedMinute(Number(val))}
                 height={210}
                 itemHeight={42}
+              />
+            </div>
+          ) : (
+            <div className="max-w-sm mx-auto">
+              {/* Rotation / Purpose Single Cylinder Wheel */}
+              <DrumWheelColumn
+                id="drum-rotation-column"
+                label="ROTATION TYPE / PURPOSE OF TRIP"
+                options={rotationOptions}
+                selectedValue={selectedRotation}
+                onSelect={val => setSelectedRotation(String(val) as PurposeOfTrip)}
+                height={220}
+                itemHeight={44}
               />
             </div>
           )}
@@ -449,6 +507,16 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
           </div>
         )}
 
+        {/* Description Banner (if Rotation mode) */}
+        {(mode === 'rotation' || mode === 'purpose') && (
+          <div className="px-5 py-2 border-t border-zinc-800/80 bg-zinc-950/40 flex items-center justify-between text-xs">
+            <span className="text-[10px] text-zinc-400 uppercase tracking-wider">Selected Definition:</span>
+            <span className="text-zinc-300 font-medium text-[11px] truncate max-w-[240px]">
+              {activeRotationMeta.description}
+            </span>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="px-5 py-3 border-t border-zinc-800 bg-zinc-950/80 flex items-center justify-between">
           <button
@@ -459,9 +527,11 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
                 setSelectedYear(now.getFullYear());
                 setSelectedMonth(now.getMonth());
                 setSelectedDay(now.getDate());
-              } else {
+              } else if (mode === 'time') {
                 setSelectedHour(6);
                 setSelectedMinute(45);
+              } else {
+                setSelectedRotation('Mobilization');
               }
             }}
             className="flex items-center gap-1 px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800/60 hover:bg-zinc-800 rounded-lg border border-zinc-700/60 transition-colors cursor-pointer"

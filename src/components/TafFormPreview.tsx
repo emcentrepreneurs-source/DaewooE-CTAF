@@ -374,27 +374,35 @@ export const TafFormPreview: React.FC<TafFormPreviewProps> = ({
                 <div className="col-span-2 py-1">AIRLINE & FLIGHT NUMBER</div>
               </div>
 
-              {/* Row 1: Primary Flight */}
-              <div className="grid grid-cols-12 text-[9px] text-center border-b border-black bg-white min-h-[20px] items-center">
-                <div className="col-span-2 py-0.5 border-r border-black font-medium">{flight1.date}</div>
-                <div className="col-span-2 py-0.5 border-r border-black font-medium">{flight1.from}</div>
-                <div className="col-span-2 py-0.5 border-r border-black font-medium">{flight1.to}</div>
-                <div className="col-span-2 py-0.5 border-r border-black font-medium">{flight1.departureTime}</div>
-                <div className="col-span-2 py-0.5 border-r border-black font-medium">{flight1.arrivalTime}</div>
-                <div className="col-span-2 py-0.5 font-medium">{flight1.airlineAndFlightNo}</div>
-              </div>
-
-              {/* Empty Rows 2, 3, 4 for flight plan */}
-              {[1, 2, 3].map(idx => (
-                <div key={idx} className="grid grid-cols-12 text-[9px] text-center border-b border-black bg-white min-h-[18px]">
-                  <div className="col-span-2 border-r border-black"></div>
-                  <div className="col-span-2 border-r border-black"></div>
-                  <div className="col-span-2 border-r border-black"></div>
-                  <div className="col-span-2 border-r border-black"></div>
-                  <div className="col-span-2 border-r border-black"></div>
-                  <div className="col-span-2"></div>
-                </div>
-              ))}
+              {/* Flight Rows (Up to 4 rows as per standard TAF format) */}
+              {[0, 1, 2, 3].map(idx => {
+                const flt = traveler.flights?.[idx];
+                return (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-12 text-[9px] text-center border-b border-black bg-white min-h-[20px] items-center"
+                  >
+                    <div className="col-span-2 py-0.5 border-r border-black font-medium">
+                      {flt?.date || ''}
+                    </div>
+                    <div className="col-span-2 py-0.5 border-r border-black font-medium">
+                      {flt?.from || ''}
+                    </div>
+                    <div className="col-span-2 py-0.5 border-r border-black font-medium">
+                      {flt?.to || ''}
+                    </div>
+                    <div className="col-span-2 py-0.5 border-r border-black font-medium">
+                      {flt?.departureTime || ''}
+                    </div>
+                    <div className="col-span-2 py-0.5 border-r border-black font-medium">
+                      {flt?.arrivalTime || ''}
+                    </div>
+                    <div className="col-span-2 py-0.5 font-medium">
+                      {flt?.airlineAndFlightNo || ''}
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* Table Subtitle: ACCOMMODATION */}
               <div className="border-b border-black text-center py-0.5 bg-slate-50 font-bold text-[9.5px]">
@@ -410,25 +418,32 @@ export const TafFormPreview: React.FC<TafFormPreviewProps> = ({
                 <div className="col-span-2 py-1">NOTES</div>
               </div>
 
-              {/* Row 1: Accommodation details */}
-              <div className="grid grid-cols-12 text-[9px] text-center border-b border-black bg-white min-h-[20px] items-center">
-                <div className="col-span-2 py-0.5 border-r border-black font-medium">{acc1.checkIn}</div>
-                <div className="col-span-2 py-0.5 border-r border-black font-medium">{acc1.checkOut}</div>
-                <div className="col-span-3 py-0.5 border-r border-black font-medium">{acc1.hotelOrCamp}</div>
-                <div className="col-span-3 py-0.5 border-r border-black font-medium">{acc1.location}</div>
-                <div className="col-span-2 py-0.5 font-medium">{acc1.notes}</div>
-              </div>
-
-              {/* Empty Accommodation rows */}
-              {[1, 2, 3].map(idx => (
-                <div key={idx} className="grid grid-cols-12 text-[9px] text-center border-b border-black bg-white min-h-[18px]">
-                  <div className="col-span-2 border-r border-black"></div>
-                  <div className="col-span-2 border-r border-black"></div>
-                  <div className="col-span-3 border-r border-black"></div>
-                  <div className="col-span-3 border-r border-black"></div>
-                  <div className="col-span-2"></div>
-                </div>
-              ))}
+              {/* Accommodation Rows (Up to 4 rows as per standard TAF format) */}
+              {[0, 1, 2, 3].map(idx => {
+                const acc = traveler.accommodation?.[idx];
+                return (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-12 text-[9px] text-center border-b border-black bg-white min-h-[20px] items-center"
+                  >
+                    <div className="col-span-2 py-0.5 border-r border-black font-medium">
+                      {acc?.checkIn || ''}
+                    </div>
+                    <div className="col-span-2 py-0.5 border-r border-black font-medium">
+                      {acc?.checkOut || ''}
+                    </div>
+                    <div className="col-span-3 py-0.5 border-r border-black font-medium">
+                      {acc?.hotelOrCamp || ''}
+                    </div>
+                    <div className="col-span-3 py-0.5 border-r border-black font-medium">
+                      {acc?.location || ''}
+                    </div>
+                    <div className="col-span-2 py-0.5 font-medium">
+                      {acc?.notes || ''}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* SECTION 5 - APPROVAL SIGNATURES */}
