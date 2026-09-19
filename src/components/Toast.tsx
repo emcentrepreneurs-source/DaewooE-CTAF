@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { CheckCircle2, AlertCircle, Info, X, Database } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X, Database } from 'lucide-react';
 
 export interface ToastMessage {
   id: string;
-  type?: 'success' | 'error' | 'info';
+  type?: 'success' | 'error' | 'info' | 'warning';
   title: string;
   message?: string;
   showDatabaseBadge?: boolean;
@@ -57,6 +57,8 @@ const ToastItem: React.FC<{
           ? 'bg-zinc-900/95 border-emerald-500/30 shadow-emerald-950/20 text-zinc-100'
           : type === 'error'
           ? 'bg-zinc-900/95 border-rose-500/30 shadow-rose-950/20 text-zinc-100'
+          : type === 'warning'
+          ? 'bg-zinc-900/95 border-amber-500/30 shadow-amber-950/20 text-zinc-100'
           : 'bg-zinc-900/95 border-zinc-700/80 shadow-black/40 text-zinc-100'
       }`}
     >
@@ -67,6 +69,8 @@ const ToastItem: React.FC<{
               ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
               : type === 'error'
               ? 'bg-rose-500/15 text-rose-400 border border-rose-500/20'
+              : type === 'warning'
+              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
               : 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20'
           }`}
         >
@@ -74,6 +78,8 @@ const ToastItem: React.FC<{
             <CheckCircle2 className="w-4 h-4" />
           ) : type === 'error' ? (
             <AlertCircle className="w-4 h-4" />
+          ) : type === 'warning' ? (
+            <AlertTriangle className="w-4 h-4" />
           ) : (
             <Info className="w-4 h-4" />
           )}

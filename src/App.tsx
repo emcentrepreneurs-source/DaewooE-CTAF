@@ -75,6 +75,15 @@ export default function App() {
     setToasts(prev => [...prev, { ...toast, id }]);
   };
 
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    addToast({
+      title: type === 'success' ? 'Excel Export' : type === 'error' ? 'Export Error' : 'TAF Manifest',
+      message,
+      type,
+      duration: 3500
+    });
+  };
+
   const dismissToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
@@ -579,6 +588,8 @@ export default function App() {
         <FileUploadArea
           onTravelersLoaded={handleTravelersLoaded}
           onOpenScanner={() => setIsScannerModalOpen(true)}
+          savedTravelers={travelers}
+          onToast={showToast}
         />
 
         {/* 2. Navigation Tabs */}
@@ -639,6 +650,7 @@ export default function App() {
             onBatchSettings={() => setIsBatchSettingsOpen(true)}
             onBatchZipDownload={handleBatchZipDownload}
             onCombinedPdfDownload={handleCombinedPdfDownload}
+            onToast={showToast}
             isProcessingBatch={batchProgress.status === 'generating' || batchProgress.status === 'zipping'}
           />
         ) : (

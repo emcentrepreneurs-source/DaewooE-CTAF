@@ -110,11 +110,39 @@ const MONTH_MAP: Record<string, string> = {
 
 /**
  * High-accuracy date parser for passports & IDs
- * Standardizes to DD-Mon-YY (e.g. 18-Aug-87)
+ * Standardizes to DD-Mon-YY (e.g. 18-Aug-87) or VITALÍCIO for lifetime IDs
  */
 export function normalizeDate(raw: string, isExpiry: boolean = false): string {
   if (!raw) return '';
   const clean = raw.trim();
+
+  // If isExpiry and text indicates vitalicio / lifetime / no expiry / indeterminate:
+  if (isExpiry) {
+    const s = clean.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (
+      s === 'VITALICIO' ||
+      s === 'VITALÍCIO' ||
+      s === 'LIFETIME' ||
+      s === 'INDETERMINADO' ||
+      s === 'INDETERMINATE' ||
+      s === 'SEM VALIDADE' ||
+      s === 'PERMANENTE' ||
+      s === 'PERMANENT' ||
+      s === 'DOES NOT EXPIRE' ||
+      s === 'NO EXPIRY' ||
+      s === 'ISENTO' ||
+      s === 'N/A' ||
+      s === 'NA' ||
+      s === 'NONE' ||
+      s.includes('VITALIC') ||
+      s.includes('LIFETIME') ||
+      s.includes('INDETERMIN') ||
+      s.includes('NO EXPIR') ||
+      s.includes('NOT EXPIR')
+    ) {
+      return 'VITALÍCIO';
+    }
+  }
 
   // MRZ Format: 6 digits YYMMDD
   if (/^\d{6}$/.test(clean)) {
@@ -285,6 +313,7 @@ CRITICAL EXTRACTION GUIDELINES:
    - "Nomes": Given names.
    - "Data de Nascimento": Date of birth.
    - "Data de Validade" or "Válido até": Expiry date.
+   - CRITICAL FOR OLDER AGE CITIZENS (Age 60+): Under Mozambican law, National ID cards (BI) issued to senior citizens (aged 60 and above) do NOT expire (marked as "VITALÍCIO", "Vitalício", or left without an expiry date). If the document indicates Vitalício, or if the citizen is Mozambican and aged 60+ with no expiry date on their BI, return "passportExpiryDate": "VITALÍCIO".
 
 4. COMPANY & PROJECT DEFAULTS (For CCS JV / Mozambique LNG Site):
    - Company: If DAEWOO, SAIPEM, CCS JV, TOTALENERGIES, or contractor is visible, extract it; default "DAEWOO".
@@ -402,9 +431,34 @@ Return a JSON object conforming strictly to this structure:
       // Expiry validation check
       let isExpired = false;
       let isExpiringSoon = false;
-      if (passportExpiryDate) {
+
+      // Check if senior citizen Mozambican ID (Age 60+)
+      let isMozSenior = false;
+      if (nationality === 'MOZAMBICAN' && dateOfBirth) {
+        const parts = dateOfBirth.split('-');
+        if (parts.length === 3) {
+          const yy = parseInt(parts[2], 10);
+          const birthYear = yy < 50 ? 2000 + yy : 1900 + yy;
+          const currentYear = new Date().getFullYear();
+          if (currentYear - birthYear >= 60) {
+            isMozSenior = true;
+          }
+        }
+      }
+
+      let effectivePassportExpiryDate = passportExpiryDate;
+      if (
+        passportExpiryDate === 'VITALÍCIO' ||
+        (isMozSenior && (!passportExpiryDate || passportExpiryDate === '01-Jan-32'))
+      ) {
+        effectivePassportExpiryDate = 'VITALÍCIO';
+      }
+
+      if (effectivePassportExpiryDate === 'VITALÍCIO') {
+        checksPassed.push('Mozambique National ID: Senior (60+) / Vitalício Lifetime ID (No Expiry Date)');
+      } else if (effectivePassportExpiryDate) {
         // Parse expiry year/month
-        const parts = passportExpiryDate.split('-');
+        const parts = effectivePassportExpiryDate.split('-');
         if (parts.length === 3) {
           const dd = parseInt(parts[0], 10);
           const mmStr = parts[1];
@@ -418,11 +472,17 @@ Return a JSON object conforming strictly to this structure:
             sixMonthsFuture.setMonth(sixMonthsFuture.getMonth() + 6);
 
             if (expiryObj < now) {
-              isExpired = true;
-              warnings.push('CRITICAL: Document has EXPIRED. Please verify before issuing flight booking.');
+              if (isMozSenior) {
+                checksPassed.push('Mozambique National ID: Senior citizen (60+) Vitalício ID status applied');
+              } else {
+                isExpired = true;
+                warnings.push('CRITICAL: Document has EXPIRED. Please verify before issuing flight booking.');
+              }
             } else if (expiryObj < sixMonthsFuture) {
-              isExpiringSoon = true;
-              warnings.push('NOTICE: Document expires in under 6 months. May require renewal for international travel.');
+              if (!isMozSenior) {
+                isExpiringSoon = true;
+                warnings.push('NOTICE: Document expires in under 6 months. May require renewal for international travel.');
+              }
             } else {
               checksPassed.push('Document validity extends beyond 6-month international travel requirement');
             }
@@ -439,7 +499,7 @@ Return a JSON object conforming strictly to this structure:
         dateOfBirthRaw: parsed.dateOfBirthRaw || parsed.dateOfBirth,
         nationality,
         nationalityCode: code || 'MOZ',
-        passportExpiryDate,
+        passportExpiryDate: effectivePassportExpiryDate,
         passportExpiryDateRaw: parsed.passportExpiryDateRaw || parsed.passportExpiryDate,
         gender,
         companyId: parsed.companyId || '30190',

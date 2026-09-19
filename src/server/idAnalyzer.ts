@@ -212,16 +212,39 @@ export async function scanWithIdAnalyzer(
     // Expiry check
     let isExpired = false;
     let isExpiringSoon = false;
-    if (passportExpiryDate) {
+
+    // Mozambique Senior Check (Age 60+)
+    let isMozSenior = false;
+    if (nationality === 'MOZAMBICAN' && dateOfBirth) {
+      const parts = dateOfBirth.split('-');
+      if (parts.length === 3) {
+        const yy = parseInt(parts[2], 10);
+        const birthYear = yy < 50 ? 2000 + yy : 1900 + yy;
+        const currentYear = new Date().getFullYear();
+        if (currentYear - birthYear >= 60) {
+          isMozSenior = true;
+        }
+      }
+    }
+
+    let finalExpiryDate = passportExpiryDate;
+    if (passportExpiryDate === 'VITALÍCIO' || (isMozSenior && (!passportExpiryDate || passportExpiryDate === '01-Jan-32'))) {
+      finalExpiryDate = 'VITALÍCIO';
+    }
+
+    if (finalExpiryDate && finalExpiryDate !== 'VITALÍCIO') {
       const now = new Date();
-      const [d, m, y] = passportExpiryDate.split('-');
+      const [d, m, y] = finalExpiryDate.split('-');
       const year = parseInt(y, 10) + (parseInt(y, 10) < 50 ? 2000 : 1900);
       const monthIdx = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(m);
       if (monthIdx >= 0) {
         const expiryObj = new Date(year, monthIdx, parseInt(d, 10));
         const diffMonths = (expiryObj.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30);
-        if (diffMonths <= 0) isExpired = true;
-        else if (diffMonths < 6) isExpiringSoon = true;
+        if (diffMonths <= 0) {
+          if (!isMozSenior) isExpired = true;
+        } else if (diffMonths < 6) {
+          if (!isMozSenior) isExpiringSoon = true;
+        }
       }
     }
 
@@ -236,7 +259,7 @@ export async function scanWithIdAnalyzer(
       dateOfBirthRaw: rawDob,
       nationality,
       nationalityCode: countryCode,
-      passportExpiryDate: passportExpiryDate || '01-Jan-32',
+      passportExpiryDate: finalExpiryDate || '01-Jan-32',
       passportExpiryDateRaw: rawExpiry,
       gender,
       documentType,

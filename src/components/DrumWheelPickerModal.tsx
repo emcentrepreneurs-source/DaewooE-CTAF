@@ -292,6 +292,17 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
                 <>
                   <button
                     type="button"
+                    onClick={() => {
+                      onConfirm('VITALÍCIO');
+                      onClose();
+                    }}
+                    className="px-2 py-1 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 rounded-md border border-emerald-700/60 font-medium whitespace-nowrap transition-colors cursor-pointer"
+                    title="Mozambique National ID for senior citizens (60+) is Vitalício / Does not expire"
+                  >
+                    🛡️ Vitalício (Moz ID 60+)
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setQuickDate(5)}
                     className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-md border border-zinc-700 whitespace-nowrap transition-colors cursor-pointer"
                   >

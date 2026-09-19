@@ -1018,17 +1018,27 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
                         <label className="text-[10px] text-zinc-400 uppercase font-semibold">
                           Document Expiry Date
                         </label>
-                        <DrumPickerTriggerButton
-                          onClick={() => setActiveDrumPicker('expiry')}
-                          title="Open Drum Wheel Expiry Date Picker"
-                        />
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => updateCurrentField('passportExpiryDate', 'VITALÍCIO')}
+                            className="px-1.5 py-0.5 rounded bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/70 text-[9px] font-semibold transition-colors cursor-pointer"
+                            title="Mozambique ID for senior age (60+) does not expire (Vitalício)"
+                          >
+                            🛡️ Vitalício (Moz ID)
+                          </button>
+                          <DrumPickerTriggerButton
+                            onClick={() => setActiveDrumPicker('expiry')}
+                            title="Open Drum Wheel Expiry Date Picker"
+                          />
+                        </div>
                       </div>
                       <input
                         type="text"
                         value={currentResult.passportExpiryDate}
                         onChange={e => updateCurrentField('passportExpiryDate', e.target.value)}
                         className="w-full bg-zinc-950 px-2 py-1 rounded text-zinc-200 font-mono font-medium border border-zinc-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        placeholder="DD-Mon-YY (e.g. 12-Nov-31)"
+                        placeholder="DD-Mon-YY or VITALÍCIO"
                       />
                     </div>
 

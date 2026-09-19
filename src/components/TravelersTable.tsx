@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TravelerRecord } from '../types';
 import {
   Search,
@@ -20,13 +20,21 @@ import {
   Calendar,
   FileSignature,
   Filter,
-  Sparkles
+  Sparkles,
+  Shield,
+  FileSpreadsheet,
+  Download,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import { downloadSinglePdf } from '../utils/zipExporter';
+import { downloadTravelersExcel, downloadBlankExcelTemplate } from '../utils/sampleData';
 import {
   validateTravelerDatesAndTimes,
   validatePassportExpiry,
-  validateDate
+  validateDate,
+  isMozambicanSenior,
+  isLifetimeExpiry
 } from '../utils/dateTimeValidation';
 
 export interface TravelerCriticalIssues {
@@ -36,6 +44,9 @@ export interface TravelerCriticalIssues {
   missingPassportExpiry: boolean;
   isPassportExpired: boolean;
   passportExpiringSoon: boolean;
+  isLifetime?: boolean;
+  isMozambicanSenior?: boolean;
+  badgeLabel?: string;
   passportExpiryMessage?: string;
   missingFlightDate: boolean;
   isFlightDateInvalid: boolean;
@@ -57,6 +68,9 @@ export function getTravelerCriticalIssues(t: TravelerRecord): TravelerCriticalIs
   let missingPassportExpiry = false;
   let isPassportExpired = false;
   let passportExpiringSoon = false;
+  let isLifetime = false;
+  let isMozSenior = false;
+  let badgeLabel: string | undefined;
   let passportExpiryMessage: string | undefined;
 
   let missingFlightDate = false;
@@ -72,13 +86,20 @@ export function getTravelerCriticalIssues(t: TravelerRecord): TravelerCriticalIs
   const dtStatus = validateTravelerDatesAndTimes(t);
   const flight = t.flights?.[0];
 
-  // 1. Passport / ID Expiry Check
-  if (!t.passportExpiryDate || t.passportExpiryDate.trim() === '') {
+  // 1. Passport / ID Expiry Check (with Mozambican Senior / Lifetime ID support)
+  const seniorStatus = isMozambicanSenior(t);
+  const expVal = validatePassportExpiry(t.passportExpiryDate, flight?.date, t);
+
+  if (expVal.isLifetime || seniorStatus.isSenior || isLifetimeExpiry(t.passportExpiryDate)) {
+    isLifetime = true;
+    isMozSenior = !!seniorStatus.isSenior;
+    badgeLabel = expVal.badgeLabel || (isMozSenior ? 'Vitalício (Moz ID 60+)' : 'Vitalício (Lifetime)');
+    passportExpiryMessage = seniorStatus.reason || 'Mozambique National ID for senior citizens (60+) is Vitalício and does not expire.';
+  } else if (!t.passportExpiryDate || t.passportExpiryDate.trim() === '') {
     missingPassportExpiry = true;
     passportExpiryMessage = 'Passport / ID Expiry date is missing';
     criticalErrors.push('Missing Passport / ID Expiry date');
   } else {
-    const expVal = validatePassportExpiry(t.passportExpiryDate, flight?.date);
     if (!expVal.isValid) {
       isPassportExpired = true;
       passportExpiryMessage = expVal.error || 'Passport/ID has expired';
@@ -163,6 +184,9 @@ export function getTravelerCriticalIssues(t: TravelerRecord): TravelerCriticalIs
     missingPassportExpiry,
     isPassportExpired,
     passportExpiringSoon,
+    isLifetime,
+    isMozambicanSenior: isMozSenior,
+    badgeLabel,
     passportExpiryMessage,
     missingFlightDate,
     isFlightDateInvalid,
@@ -191,6 +215,8 @@ interface TravelersTableProps {
   onBatchSettings: () => void;
   onBatchZipDownload: (selectedOnly?: boolean) => void;
   onCombinedPdfDownload: (selectedOnly?: boolean) => void;
+  onDownloadExcel?: (selectedOnly?: boolean) => void;
+  onToast?: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   isProcessingBatch?: boolean;
 }
 
@@ -208,12 +234,43 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
   onBatchSettings,
   onBatchZipDownload,
   onCombinedPdfDownload,
+  onDownloadExcel,
+  onToast,
   isProcessingBatch = false
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCompany, setFilterCompany] = useState<string>('ALL');
   const [filterPurpose, setFilterPurpose] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'NEEDS_FIX' | 'WARNINGS' | 'READY'>('ALL');
+  const [isExcelMenuOpen, setIsExcelMenuOpen] = useState(false);
+  const excelMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close Excel menu on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (excelMenuRef.current && !excelMenuRef.current.contains(e.target as Node)) {
+        setIsExcelMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const handleExportExcel = (selectedOnly: boolean = false) => {
+    if (onDownloadExcel) {
+      onDownloadExcel(selectedOnly);
+      return;
+    }
+    const listToExport = selectedOnly && selectedIds.length > 0
+      ? travelers.filter(t => selectedIds.includes(t.id))
+      : travelers;
+    if (listToExport.length === 0) return;
+    downloadTravelersExcel(listToExport);
+    onToast?.(
+      `Downloaded Excel template with ${listToExport.length} saved traveler records.`,
+      'success'
+    );
+  };
 
   // Unique companies
   const companies = useMemo(() => {
@@ -349,6 +406,94 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
               <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400" />
               Batch Set Flight/Camp
             </button>
+
+            {/* Download Excel Template with Saved TAFs */}
+            <div className="relative inline-flex rounded-lg shadow-sm" ref={excelMenuRef}>
+              <button
+                id="download-excel-manifest-btn"
+                onClick={() => handleExportExcel(selectedIds.length > 0)}
+                disabled={travelers.length === 0}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-300 hover:text-white rounded-l-lg border border-emerald-700/60 transition-colors disabled:opacity-40 cursor-pointer shadow-sm"
+                title={
+                  selectedIds.length > 0
+                    ? `Download standard Excel template containing the ${selectedIds.length} selected saved TAF records`
+                    : `Download standard Excel template containing all ${travelers.length} saved TAF records`
+                }
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                <span>
+                  {selectedIds.length > 0
+                    ? `Download Excel (${selectedIds.length} Selected)`
+                    : `Download Excel Template (${travelers.length} TAFs)`}
+                </span>
+              </button>
+
+              <button
+                id="download-excel-options-btn"
+                onClick={() => setIsExcelMenuOpen(!isExcelMenuOpen)}
+                disabled={travelers.length === 0}
+                className="px-2 py-2 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white rounded-r-lg border-y border-r border-emerald-700/60 transition-colors disabled:opacity-40 cursor-pointer"
+                title="Excel template export options"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+
+              {isExcelMenuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-72 bg-zinc-900 border border-zinc-700/90 rounded-xl shadow-2xl z-30 py-1.5 overflow-hidden backdrop-blur-md">
+                  <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                    Excel Template Export
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsExcelMenuOpen(false);
+                      handleExportExcel(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800 flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                      <div>
+                        <div className="font-medium">All Saved TAFs ({travelers.length})</div>
+                        <div className="text-[10px] text-zinc-400">Complete manifest in standard layout</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  {selectedIds.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setIsExcelMenuOpen(false);
+                        handleExportExcel(true);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs text-emerald-300 hover:bg-emerald-950/60 flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <div>
+                          <div className="font-medium">Selected TAFs Only ({selectedIds.length})</div>
+                          <div className="text-[10px] text-zinc-400">Only rows with checkboxes checked</div>
+                        </div>
+                      </div>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setIsExcelMenuOpen(false);
+                      downloadBlankExcelTemplate();
+                      onToast?.('Downloaded blank official Excel template.', 'success');
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-800/80 mt-1"
+                  >
+                    <Download className="w-3.5 h-3.5 text-indigo-400" />
+                    <div>
+                      <div className="font-medium">Blank Official Template</div>
+                      <div className="text-[10px] text-zinc-400">Empty headers ready for distribution</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
 
             <button
               id="download-combined-pdf-btn"
@@ -686,7 +831,15 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
                         <span>•</span>
 
                         {/* Expiry */}
-                        {issues.missingPassportExpiry ? (
+                        {issues.isLifetime ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold text-[11px] cursor-help"
+                            title={issues.passportExpiryMessage || "Mozambique ID for senior age (60+) is Vitalício and does not expire"}
+                          >
+                            <Shield className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+                            {issues.badgeLabel || 'Vitalício (Lifetime)'}
+                          </span>
+                        ) : issues.missingPassportExpiry ? (
                           <span
                             className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-500/25 text-rose-200 border border-rose-500/50 font-bold cursor-help"
                             title="Passport / ID expiry date is required for site security clearance"

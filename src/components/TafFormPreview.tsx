@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { TravelerRecord } from '../types';
 import { downloadSinglePdf } from '../utils/zipExporter';
+import { downloadTravelersExcel } from '../utils/sampleData';
 import { CCS_JV_LOGO_BASE64 } from '../assets/logo';
 import { ERIC_MATOLA_SIGNATURE_BASE64, DEFAULT_SIGNATURE_NAME } from '../assets/signature';
-import { Download, Printer, ZoomIn, ZoomOut, RotateCcw, Edit3, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Printer, ZoomIn, ZoomOut, RotateCcw, Edit3, Check, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 
 interface TafFormPreviewProps {
   traveler: TravelerRecord;
@@ -143,6 +144,16 @@ export const TafFormPreview: React.FC<TafFormPreviewProps> = ({
           >
             <Printer className="w-3.5 h-3.5 text-zinc-300" />
             Print Form
+          </button>
+
+          <button
+            id="preview-download-excel-btn"
+            onClick={() => downloadTravelersExcel([traveler])}
+            className="flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-white rounded-lg border border-emerald-700/60 transition-colors cursor-pointer"
+            title="Download Excel spreadsheet template populated with this traveler's details"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Download Excel</span>
           </button>
 
           <button

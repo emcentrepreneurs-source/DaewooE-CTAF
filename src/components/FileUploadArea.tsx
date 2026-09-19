@@ -1,30 +1,83 @@
-import React, { useRef, useState } from 'react';
-import { UploadCloud, FileSpreadsheet, Download, Sparkles, AlertCircle, CheckCircle2, Camera } from 'lucide-react';
-import { generateSampleExcelBlob, SAMPLE_TRAVELERS } from '../utils/sampleData';
+import React, { useRef, useState, useEffect } from 'react';
+import { UploadCloud, FileSpreadsheet, Download, Sparkles, AlertCircle, CheckCircle2, Camera, ChevronDown, Check, FileText } from 'lucide-react';
+import {
+  generateTravelersExcelBlob,
+  downloadTravelersExcel,
+  downloadBlankExcelTemplate,
+  downloadSampleExcelTemplate,
+  SAMPLE_TRAVELERS
+} from '../utils/sampleData';
 import { parseExcelFile } from '../utils/excelParser';
 import { TravelerRecord } from '../types';
-import { saveAs } from 'file-saver';
 
 interface FileUploadAreaProps {
   onTravelersLoaded: (travelers: TravelerRecord[], fileName: string) => void;
   onOpenScanner?: () => void;
   isLoading?: boolean;
+  savedTravelers?: TravelerRecord[];
+  onToast?: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
 export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
   onTravelersLoaded,
   onOpenScanner,
-  isLoading = false
+  isLoading = false,
+  savedTravelers = [],
+  onToast
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastUploadedName, setLastUploadedName] = useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const handleDownloadTemplate = () => {
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const hasSavedTravelers = savedTravelers && savedTravelers.length > 0;
+
+  const handleDownloadSavedTemplate = () => {
     try {
-      const blob = generateSampleExcelBlob();
-      saveAs(blob, 'CCSJV_TAF_Travelers_Template_12_Records.xlsx');
+      if (hasSavedTravelers) {
+        downloadTravelersExcel(savedTravelers);
+        onToast?.(`Downloaded Excel template with ${savedTravelers.length} saved TAF records.`, 'success');
+      } else {
+        downloadSampleExcelTemplate();
+        onToast?.('Downloaded Excel template with 12 sample traveler records.', 'info');
+      }
+      setIsMenuOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg('Failed to download Excel template.');
+      onToast?.('Failed to download Excel template.', 'error');
+    }
+  };
+
+  const handleDownloadBlankTemplate = () => {
+    try {
+      downloadBlankExcelTemplate();
+      setIsMenuOpen(false);
+      onToast?.('Downloaded blank official TAF Excel template.', 'success');
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg('Failed to download blank template.');
+    }
+  };
+
+  const handleDownloadSampleTemplate = () => {
+    try {
+      downloadSampleExcelTemplate();
+      setIsMenuOpen(false);
+      onToast?.('Downloaded Excel template with 12 sample traveler records.', 'info');
     } catch (err: any) {
       console.error(err);
       setErrorMsg('Failed to download sample template.');
@@ -115,15 +168,94 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
             </button>
           )}
 
-          <button
-            id="download-template-btn"
-            onClick={handleDownloadTemplate}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 px-3.5 py-2 rounded-lg border border-zinc-700 transition-colors"
-            title="Download ready-to-fill Excel spreadsheet with 12 sample traveler records"
-          >
-            <Download className="w-3.5 h-3.5 text-zinc-400" />
-            Download Excel Template (.xlsx)
-          </button>
+          {/* Download Template Button with Saved TAFs intelligence */}
+          <div className="relative flex-1 sm:flex-none" ref={menuRef}>
+            <div className="inline-flex rounded-lg shadow-sm w-full">
+              <button
+                id="download-template-btn"
+                onClick={handleDownloadSavedTemplate}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-l-lg border transition-all cursor-pointer ${
+                  hasSavedTravelers
+                    ? 'bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-200 border-emerald-700/70'
+                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700'
+                }`}
+                title={
+                  hasSavedTravelers
+                    ? `Download Excel template populated with your ${savedTravelers.length} saved TAF records`
+                    : 'Download ready-to-fill Excel spreadsheet with 12 sample traveler records'
+                }
+              >
+                <FileSpreadsheet className={`w-3.5 h-3.5 ${hasSavedTravelers ? 'text-emerald-400' : 'text-zinc-400'}`} />
+                <span>
+                  {hasSavedTravelers
+                    ? `Download Template (${savedTravelers.length} Saved TAFs)`
+                    : 'Download Excel Template (.xlsx)'}
+                </span>
+              </button>
+
+              <button
+                id="download-template-menu-btn"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className={`px-2 py-2 rounded-r-lg border-y border-r transition-all cursor-pointer ${
+                  hasSavedTravelers
+                    ? 'bg-emerald-950/90 hover:bg-emerald-900 text-emerald-300 border-emerald-700/70'
+                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border-zinc-700'
+                }`}
+                title="Template download options (Saved TAFs, Blank Template, Sample)"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Dropdown Menu */}
+            {isMenuOpen && (
+              <div className="absolute right-0 mt-1.5 w-72 bg-zinc-900 border border-zinc-700/90 rounded-xl shadow-2xl z-30 py-1.5 overflow-hidden backdrop-blur-md">
+                <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                  Template Download Options
+                </div>
+
+                {hasSavedTravelers && (
+                  <button
+                    onClick={handleDownloadSavedTemplate}
+                    className="w-full text-left px-3 py-2 text-xs text-emerald-300 hover:bg-emerald-950/60 flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <div>
+                        <div className="font-medium text-zinc-200">With Saved TAF Records</div>
+                        <div className="text-[10px] text-zinc-400">{savedTravelers.length} saved records included</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] bg-emerald-900/80 text-emerald-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                      {savedTravelers.length} TAFs
+                    </span>
+                  </button>
+                )}
+
+                <button
+                  onClick={handleDownloadBlankTemplate}
+                  className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <div>
+                    <div className="font-medium text-zinc-200">Blank Official Template</div>
+                    <div className="text-[10px] text-zinc-400">Empty standard headers for distributing to staff</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleDownloadSampleTemplate}
+                  className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <div>
+                    <div className="font-medium text-zinc-200">Sample Template (12 Demo Records)</div>
+                    <div className="text-[10px] text-zinc-400">Pre-filled with DAEWOO Mozambique LNG examples</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             id="load-sample-btn"
@@ -136,6 +268,24 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
           </button>
         </div>
       </div>
+
+      {hasSavedTravelers && (
+        <div className="mb-4 px-3.5 py-2.5 bg-emerald-950/40 border border-emerald-800/60 rounded-xl flex items-center justify-between gap-3 text-xs text-emerald-300">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>
+              <strong>{savedTravelers.length} saved TAF records</strong> currently available. You can download the Excel template containing your saved data anytime.
+            </span>
+          </div>
+          <button
+            onClick={handleDownloadSavedTemplate}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download Excel ({savedTravelers.length} TAFs)
+          </button>
+        </div>
+      )}
 
       {/* Drag & Drop Card */}
       <div

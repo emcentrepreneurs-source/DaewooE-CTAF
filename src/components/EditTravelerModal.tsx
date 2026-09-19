@@ -16,7 +16,8 @@ import {
   AlertCircle,
   Plus,
   Trash2,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Shield
 } from 'lucide-react';
 import {
   validateDateOfBirth,
@@ -28,7 +29,10 @@ import {
   validateTravelerDatesAndTimes,
   formatToStandardDate,
   parseFlexibleDate,
-  calculateAge
+  calculateAge,
+  isMozambicanSenior,
+  isLifetimeExpiry,
+  isMozambican
 } from '../utils/dateTimeValidation';
 import { MaskedPhoneInput } from './MaskedPhoneInput';
 import { MaskedPassportInput } from './MaskedPassportInput';
@@ -287,9 +291,17 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
 
   // Real-time validations
   const dobValidation = useMemo(() => validateDateOfBirth(formData.dateOfBirth), [formData.dateOfBirth]);
+  const isSeniorMozambican = useMemo(
+    () => isMozambicanSenior(formData),
+    [formData.nationality, formData.dateOfBirth, formData.passportExpiryDate]
+  );
   const passportExpValidation = useMemo(
-    () => validatePassportExpiry(formData.passportExpiryDate, primaryFlight.date),
-    [formData.passportExpiryDate, primaryFlight.date]
+    () => validatePassportExpiry(formData.passportExpiryDate, primaryFlight.date, formData),
+    [formData.passportExpiryDate, primaryFlight.date, formData.nationality, formData.dateOfBirth, formData.passportOrIdNumber]
+  );
+  const isLifetime = useMemo(
+    () => isLifetimeExpiry(formData.passportExpiryDate) || isSeniorMozambican.isSenior || passportExpValidation.isLifetime,
+    [formData.passportExpiryDate, isSeniorMozambican.isSenior, passportExpValidation.isLifetime]
   );
   const accDatesValidation = useMemo(
     () => validateAccommodationDates(primaryAcc.checkIn, primaryAcc.checkOut),
@@ -326,7 +338,9 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
         updated.dateOfBirth = formatToStandardDate(dobValidation.parsedDate, 'dob');
       }
       // Passport Exp
-      if (passportExpValidation.parsedDate) {
+      if (isLifetimeExpiry(updated.passportExpiryDate) || (isSeniorMozambican.isSenior && (!updated.passportExpiryDate || updated.passportExpiryDate.trim() === ''))) {
+        updated.passportExpiryDate = 'VITALÍCIO';
+      } else if (passportExpValidation.parsedDate) {
         updated.passportExpiryDate = formatToStandardDate(passportExpValidation.parsedDate, 'dob');
       }
       // All Flights
@@ -677,15 +691,20 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
                 />
               </div>
 
-              {/* PASSPORT EXPIRY WITH LIVE VALIDATION */}
+              {/* PASSPORT / ID EXPIRY WITH LIVE VALIDATION & MOZAMBIQUE VITALÍCIO SUPPORT */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[11px] font-medium text-zinc-400 flex items-center gap-1">
                     <Calendar className="w-3 h-3 text-indigo-400" />
-                    PASSPORT EXPIRY *
+                    PASSPORT / ID EXPIRY *
                   </label>
                   <div className="flex items-center gap-1.5">
-                    {passportExpValidation.isValid && (
+                    {isLifetime ? (
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-0.5">
+                        <Shield className="w-2.5 h-2.5 text-emerald-400" />
+                        Vitalício
+                      </span>
+                    ) : passportExpValidation.isValid ? (
                       <span
                         className={`text-[10px] font-mono ${
                           passportExpValidation.warning ? 'text-amber-400' : 'text-emerald-400'
@@ -693,7 +712,7 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
                       >
                         {passportExpValidation.warning ? 'Expiring soon' : 'Valid'}
                       </span>
-                    )}
+                    ) : null}
                     <DrumPickerTriggerButton
                       onClick={() =>
                         openDrumDatePicker(
@@ -711,35 +730,59 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="DD-MMM-YY (e.g. 16-Jan-33)"
+                    placeholder="DD-MMM-YY or VITALÍCIO"
                     value={formData.passportExpiryDate}
                     onChange={e => handleChange('passportExpiryDate', e.target.value)}
                     className={`w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono ${
-                      !passportExpValidation.isValid
+                      isLifetime
+                        ? 'border-emerald-500/70 text-emerald-200 bg-emerald-950/20 focus:border-emerald-400'
+                        : !passportExpValidation.isValid
                         ? 'border-rose-500 text-rose-200 focus:border-rose-500'
                         : passportExpValidation.warning
                         ? 'border-amber-500 text-amber-200'
                         : 'border-zinc-700 text-zinc-100'
                     }`}
                   />
-                  <input
-                    type="date"
-                    aria-label="Pick Passport Expiry Date"
-                    className="absolute right-2 top-1.5 opacity-0 w-5 h-5 cursor-pointer"
-                    onChange={e => {
-                      if (e.target.value) {
-                        const parsed = new Date(e.target.value + 'T00:00:00');
-                        handleChange('passportExpiryDate', formatToStandardDate(parsed, 'dob'));
-                      }
-                    }}
-                  />
+                  {!isLifetime && (
+                    <input
+                      type="date"
+                      aria-label="Pick Passport Expiry Date"
+                      className="absolute right-2 top-1.5 opacity-0 w-5 h-5 cursor-pointer"
+                      onChange={e => {
+                        if (e.target.value) {
+                          const parsed = new Date(e.target.value + 'T00:00:00');
+                          handleChange('passportExpiryDate', formatToStandardDate(parsed, 'dob'));
+                        }
+                      }}
+                    />
+                  )}
                 </div>
-                {!passportExpValidation.isValid ? (
+
+                {/* Expiry Status Messages & Mozambique Senior Hint */}
+                {isLifetime ? (
+                  <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1 font-medium">
+                    <Shield className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span>Mozambique ID: Vitalício / Lifetime (No Expiry Date required under Mozambican law).</span>
+                  </p>
+                ) : !passportExpValidation.isValid ? (
                   <p className="text-[10px] text-rose-400 mt-1">{passportExpValidation.error}</p>
                 ) : passportExpValidation.warning ? (
                   <p className="text-[10px] text-amber-400 mt-1">{passportExpValidation.warning}</p>
                 ) : (
-                  <p className="text-[10px] text-zinc-500 mt-1">Standard format: DD-MMM-YY</p>
+                  <p className="text-[10px] text-zinc-500 mt-1">Standard format: DD-MMM-YY or VITALÍCIO</p>
+                )}
+
+                {/* One-click Mozambique Vitalício trigger if not currently set */}
+                {!isLifetime && (isMozambican(formData.nationality) || isSeniorMozambican.isSenior) && (
+                  <button
+                    type="button"
+                    onClick={() => handleChange('passportExpiryDate', 'VITALÍCIO')}
+                    className="mt-1.5 w-full flex items-center justify-center gap-1.5 px-2 py-1 bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-300 border border-emerald-800/70 rounded-md text-[10px] font-semibold transition-colors cursor-pointer"
+                    title="Set this Mozambique National ID as Vitalício (non-expiring for senior citizen / lifetime)"
+                  >
+                    <Shield className="w-3 h-3 text-emerald-400" />
+                    <span>Set as Vitalício (Mozambique ID does not expire for 60+)</span>
+                  </button>
                 )}
               </div>
             </div>

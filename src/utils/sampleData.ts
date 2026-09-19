@@ -1,5 +1,6 @@
 import { TravelerRecord } from '../types';
 import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 export const SAMPLE_TRAVELERS: TravelerRecord[] = [
   {
@@ -496,40 +497,89 @@ export const SAMPLE_TRAVELERS: TravelerRecord[] = [
   }
 ];
 
-export function generateSampleExcelBlob(): Blob {
-  const rows = SAMPLE_TRAVELERS.map((t, idx) => ({
-    'No': idx + 1,
-    'SURNAME': t.surname,
-    'NAME / GENDER': t.nameAndGender,
-    'FINAL DESTINATION': t.finalDestination,
-    'ROTATION TYPE': t.rotationType,
-    'PURPOSE OF TRIP': t.purposeOfTrip,
-    'COMPANY ID': t.companyId,
-    'COMPANY': t.company,
-    'PROJECT POSITION / JOB TITLE': t.projectPosition,
-    'PROJECT DEPARTMENT': t.projectDepartment,
-    'MOBILE NUMBER': t.mobileNumber,
-    'EMAIL ADDRESS': t.emailAddress,
-    'SUBSTITUTE IN MY ABSENCE': t.substituteInAbsence,
-    'FREQUENT FLYER CARD': t.frequentFlyerCard,
-    'PASSPORT/ NATIONAL ID NUMBER': t.passportOrIdNumber,
-    'DATE OF BIRTH': t.dateOfBirth,
-    'NATIONALITY': t.nationality,
-    'PASSPORT EXPIRY DATE': t.passportExpiryDate,
-    'FLIGHT DATE': t.flights[0]?.date || '8/9/2026',
-    'FROM': t.flights[0]?.from || 'PEMBA',
-    'TO': t.flights[0]?.to || 'AFUNGI',
-    'DEPARTURE TIME': t.flights[0]?.departureTime || '06:45',
-    'ARRIVAL TIME': t.flights[0]?.arrivalTime || '07:30',
-    'AIRLINE & FLIGHT NUMBER': t.flights[0]?.airlineAndFlightNo || 'SOLENTA',
-    'HOTEL / CAMP': t.accommodation[0]?.hotelOrCamp || '9500',
-    'CAMP LOCATION': t.accommodation[0]?.location || 'AFUNGI',
-    'ACCOMMODATION NOTES': t.accommodation[0]?.notes || 'SHARED',
-    'CHECK-IN': t.accommodation[0]?.checkIn || '8/9/2026',
-    'CHECK-OUT': t.accommodation[0]?.checkOut || '',
-    'SIGNATURE DATE': t.signatureDate || '06 AUGUST 2026',
-    'SIGNATURE NAME': t.signatureName || 'Eric Matola'
-  }));
+export function generateTravelersExcelBlob(
+  travelersToExport?: TravelerRecord[],
+  options?: { isBlankTemplate?: boolean }
+): Blob {
+  const isBlank = options?.isBlankTemplate;
+  const list = isBlank
+    ? []
+    : (travelersToExport && travelersToExport.length > 0 ? travelersToExport : SAMPLE_TRAVELERS);
+
+  let rows: Record<string, any>[] = [];
+
+  if (isBlank) {
+    // 1 empty row with standard headers clearly mapped
+    rows = [
+      {
+        'No': 1,
+        'SURNAME': '',
+        'NAME / GENDER': '',
+        'FINAL DESTINATION': 'Afungi',
+        'ROTATION TYPE': 'Mobilization',
+        'PURPOSE OF TRIP': 'Mobilization',
+        'COMPANY ID': '',
+        'COMPANY': 'DAEWOO',
+        'PROJECT POSITION / JOB TITLE': '',
+        'PROJECT DEPARTMENT': '',
+        'MOBILE NUMBER': '',
+        'EMAIL ADDRESS': '',
+        'SUBSTITUTE IN MY ABSENCE': 'N/A',
+        'FREQUENT FLYER CARD': 'N/A',
+        'PASSPORT/ NATIONAL ID NUMBER': '',
+        'DATE OF BIRTH': '',
+        'NATIONALITY': 'MOZAMBICAN',
+        'PASSPORT EXPIRY DATE': '',
+        'FLIGHT DATE': '',
+        'FROM': 'PEMBA',
+        'TO': 'AFUNGI',
+        'DEPARTURE TIME': '06:45',
+        'ARRIVAL TIME': '07:30',
+        'AIRLINE & FLIGHT NUMBER': 'SOLENTA',
+        'HOTEL / CAMP': '9500',
+        'CAMP LOCATION': 'AFUNGI',
+        'ACCOMMODATION NOTES': 'SHARED',
+        'CHECK-IN': '',
+        'CHECK-OUT': '',
+        'SIGNATURE DATE': '06 AUGUST 2026',
+        'SIGNATURE NAME': 'Eric Matola'
+      }
+    ];
+  } else {
+    rows = list.map((t, idx) => ({
+      'No': idx + 1,
+      'SURNAME': t.surname || '',
+      'NAME / GENDER': t.nameAndGender || '',
+      'FINAL DESTINATION': t.finalDestination || 'Afungi',
+      'ROTATION TYPE': t.rotationType || 'Mobilization',
+      'PURPOSE OF TRIP': t.purposeOfTrip || 'Mobilization',
+      'COMPANY ID': t.companyId || '',
+      'COMPANY': t.company || 'DAEWOO',
+      'PROJECT POSITION / JOB TITLE': t.projectPosition || '',
+      'PROJECT DEPARTMENT': t.projectDepartment || '',
+      'MOBILE NUMBER': t.mobileNumber || '',
+      'EMAIL ADDRESS': t.emailAddress || '',
+      'SUBSTITUTE IN MY ABSENCE': t.substituteInAbsence || 'N/A',
+      'FREQUENT FLYER CARD': t.frequentFlyerCard || 'N/A',
+      'PASSPORT/ NATIONAL ID NUMBER': t.passportOrIdNumber || '',
+      'DATE OF BIRTH': t.dateOfBirth || '',
+      'NATIONALITY': t.nationality || 'MOZAMBICAN',
+      'PASSPORT EXPIRY DATE': t.passportExpiryDate || '',
+      'FLIGHT DATE': t.flights?.[0]?.date || '',
+      'FROM': t.flights?.[0]?.from || '',
+      'TO': t.flights?.[0]?.to || '',
+      'DEPARTURE TIME': t.flights?.[0]?.departureTime || '',
+      'ARRIVAL TIME': t.flights?.[0]?.arrivalTime || '',
+      'AIRLINE & FLIGHT NUMBER': t.flights?.[0]?.airlineAndFlightNo || '',
+      'HOTEL / CAMP': t.accommodation?.[0]?.hotelOrCamp || '',
+      'CAMP LOCATION': t.accommodation?.[0]?.location || '',
+      'ACCOMMODATION NOTES': t.accommodation?.[0]?.notes || '',
+      'CHECK-IN': t.accommodation?.[0]?.checkIn || '',
+      'CHECK-OUT': t.accommodation?.[0]?.checkOut || '',
+      'SIGNATURE DATE': t.signatureDate || '06 AUGUST 2026',
+      'SIGNATURE NAME': t.signatureName || 'Eric Matola'
+    }));
+  }
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
@@ -543,4 +593,36 @@ export function generateSampleExcelBlob(): Blob {
 
   const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   return new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+export function generateSampleExcelBlob(travelers?: TravelerRecord[]): Blob {
+  return generateTravelersExcelBlob(travelers);
+}
+
+export function downloadTravelersExcel(travelers: TravelerRecord[], customFilename?: string): void {
+  if (!travelers || travelers.length === 0) {
+    throw new Error('No travelers provided for Excel export.');
+  }
+  const blob = generateTravelersExcelBlob(travelers);
+  const timestamp = new Date().toISOString().slice(0, 10);
+  let filename = customFilename;
+  if (!filename) {
+    if (travelers.length === 1) {
+      const namePart = (travelers[0].surname || 'Traveler').replace(/[^a-zA-Z0-9_-]/g, '_');
+      filename = `CCSJV_TAF_Template_${namePart}_${travelers[0].companyId || 'Doc'}.xlsx`;
+    } else {
+      filename = `CCSJV_TAF_Manifest_${travelers.length}_Saved_Records_${timestamp}.xlsx`;
+    }
+  }
+  saveAs(blob, filename);
+}
+
+export function downloadBlankExcelTemplate(): void {
+  const blob = generateTravelersExcelBlob(undefined, { isBlankTemplate: true });
+  saveAs(blob, 'CCSJV_TAF_Blank_Excel_Template.xlsx');
+}
+
+export function downloadSampleExcelTemplate(): void {
+  const blob = generateTravelersExcelBlob(SAMPLE_TRAVELERS);
+  saveAs(blob, 'CCSJV_TAF_Travelers_Template_12_Sample_Records.xlsx');
 }
