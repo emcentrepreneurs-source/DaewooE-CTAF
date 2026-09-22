@@ -213,15 +213,17 @@ export async function scanWithIdAnalyzer(
     let isExpired = false;
     let isExpiringSoon = false;
 
-    // Mozambique Senior Check (Age 60+)
+    // Mozambique Senior Check (Age 50+)
+    const isMoz = (nationality || '').toUpperCase().includes('MOZ') || nationality === 'MOZAMBICAN';
     let isMozSenior = false;
-    if (nationality === 'MOZAMBICAN' && dateOfBirth) {
+    if (isMoz && dateOfBirth) {
       const parts = dateOfBirth.split('-');
       if (parts.length === 3) {
         const yy = parseInt(parts[2], 10);
         const birthYear = yy < 50 ? 2000 + yy : 1900 + yy;
         const currentYear = new Date().getFullYear();
-        if (currentYear - birthYear >= 60) {
+        const age = currentYear - birthYear;
+        if (age >= 50) {
           isMozSenior = true;
         }
       }
@@ -230,6 +232,22 @@ export async function scanWithIdAnalyzer(
     let finalExpiryDate = passportExpiryDate;
     if (passportExpiryDate === 'VITALÍCIO' || (isMozSenior && (!passportExpiryDate || passportExpiryDate === '01-Jan-32'))) {
       finalExpiryDate = 'VITALÍCIO';
+    } else if (isMoz && (!passportExpiryDate || passportExpiryDate === '01-Jan-32') && dateOfBirth) {
+      // Auto-calculate validity based on age: Under 40 (5 yrs), 40-49 (10 yrs), 50+ (Vitalício)
+      const parts = dateOfBirth.split('-');
+      if (parts.length === 3) {
+        const yy = parseInt(parts[2], 10);
+        const birthYear = yy < 50 ? 2000 + yy : 1900 + yy;
+        const currentYear = new Date().getFullYear();
+        const age = currentYear - birthYear;
+        if (age >= 50) {
+          finalExpiryDate = 'VITALÍCIO';
+        } else {
+          const validityYears = age >= 40 ? 10 : 5;
+          const targetYear = (currentYear + validityYears) % 100;
+          finalExpiryDate = `${parts[0]}-${parts[1]}-${String(targetYear).padStart(2, '0')}`;
+        }
+      }
     }
 
     if (finalExpiryDate && finalExpiryDate !== 'VITALÍCIO') {

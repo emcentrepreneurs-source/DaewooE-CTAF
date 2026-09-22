@@ -481,9 +481,98 @@ export function isLifetimeExpiry(expiryStr?: string): boolean {
 }
 
 /**
- * Checks if a traveler qualifies as a Mozambican Senior Citizen (Age 60+)
- * Under Mozambican Law, National Identity Cards (Bilhete de Identidade - BI) for citizens aged 60+ do not expire (Vitalício).
+ * Checks if a traveler qualifies as a Mozambican Citizen with Vitalício ID (Age 50+)
+ * Under Mozambican Law, National Identity Cards (Bilhete de Identidade - BI) for citizens aged 50+ do not expire (Vitalício).
+ * Validity periods by age:
+ * - Under 40 years old: Valid for 5 years
+ * - 40 to 49 years old: Valid for 10 years
+ * - 50 years and older: Valid for life (vitalício)
  */
+export interface MozIdValidityResult {
+  age: number;
+  ageGroup: 'UNDER_40' | '40_TO_49' | '50_AND_OLDER';
+  validityYears: number; // 5, 10, or 0 (lifetime)
+  isLifetime: boolean;
+  expiryDate: string; // Standard format e.g. "12-Aug-31" or "VITALÍCIO" (aligned with birth day/month)
+  expiryDateFromToday: string; // Alternative format e.g. "22-Sep-31" or "VITALÍCIO" (aligned with current date)
+  ruleDescription: string;
+}
+
+/**
+ * Calculates Mozambique National ID (BI) validity by citizen age:
+ * - Under 40: Valid for 5 years
+ * - 40 to 49: Valid for 10 years
+ * - 50 and older: Valid for life (Vitalício)
+ */
+export function getMozambiqueIdValidityByAge(
+  dobInput: string | Date,
+  options?: {
+    baseDate?: Date | string;
+    flightDate?: string;
+  }
+): MozIdValidityResult | null {
+  const parsedDob = typeof dobInput === 'string' ? parseFlexibleDate(dobInput) : dobInput;
+  if (!parsedDob || isNaN(parsedDob.getTime())) return null;
+
+  const age = calculateAge(parsedDob);
+
+  // Determine base date for validity calculation
+  let baseDateObj = new Date();
+  if (options?.flightDate) {
+    const parsedFlight = parseFlexibleDate(options.flightDate);
+    if (parsedFlight && !isNaN(parsedFlight.getTime())) {
+      baseDateObj = parsedFlight;
+    }
+  } else if (options?.baseDate) {
+    const parsedBase = typeof options.baseDate === 'string' ? parseFlexibleDate(options.baseDate) : options.baseDate;
+    if (parsedBase && !isNaN(parsedBase.getTime())) {
+      baseDateObj = parsedBase;
+    }
+  }
+
+  const currentYear = baseDateObj.getFullYear();
+
+  // Rule 3: 50 years and older -> Valid for life (Vitalício)
+  if (age >= 50) {
+    return {
+      age,
+      ageGroup: '50_AND_OLDER',
+      validityYears: 0,
+      isLifetime: true,
+      expiryDate: 'VITALÍCIO',
+      expiryDateFromToday: 'VITALÍCIO',
+      ruleDescription: `Age 50+ (${age} yrs): Valid for life (Vitalício)`
+    };
+  }
+
+  // Rule 1 & 2: Under 40 -> 5 years; 40 to 49 -> 10 years
+  const validityYears = age >= 40 ? 10 : 5;
+  const ageGroup = age >= 40 ? '40_TO_49' : 'UNDER_40';
+  const targetYear = currentYear + validityYears;
+
+  // Primary: preserves birth day and month in targetYear
+  const expDobDay = new Date(targetYear, parsedDob.getMonth(), parsedDob.getDate());
+  const expiryDate = formatToStandardDate(expDobDay, 'dob');
+
+  // Secondary: preserves today's day and month in targetYear
+  const expToday = new Date(targetYear, baseDateObj.getMonth(), baseDateObj.getDate());
+  const expiryDateFromToday = formatToStandardDate(expToday, 'dob');
+
+  const ruleDescription = age < 40
+    ? `Under 40 (${age} yrs): Valid for 5 years`
+    : `40 to 49 (${age} yrs): Valid for 10 years`;
+
+  return {
+    age,
+    ageGroup,
+    validityYears,
+    isLifetime: false,
+    expiryDate,
+    expiryDateFromToday,
+    ruleDescription
+  };
+}
+
 export function isMozambicanSenior(travelerOrParams?: {
   nationality?: string;
   dateOfBirth?: string;
@@ -506,11 +595,12 @@ export function isMozambicanSenior(travelerOrParams?: {
     const parsedDob = parseFlexibleDate(travelerOrParams.dateOfBirth);
     if (parsedDob) {
       const age = calculateAge(parsedDob);
-      if (moz && age >= 60) {
+      // Under Mozambican Law: 50 years and older is Vitalício
+      if (moz && age >= 50) {
         return {
           isSenior: true,
           age,
-          reason: `Mozambican Citizen aged ${age} (Qualifies for Vitalício Lifetime ID under Mozambican Law)`
+          reason: `Mozambican Citizen aged ${age} (Qualifies for Vitalício Lifetime ID: 50+ years old under Mozambican Law)`
         };
       }
     }
@@ -521,7 +611,7 @@ export function isMozambicanSenior(travelerOrParams?: {
 
 /**
  * Validates Passport / National ID Expiry
- * Special rule: Mozambican National IDs for citizens aged 60+ (or marked Vitalício) do NOT expire!
+ * Special rule: Mozambican National IDs for citizens aged 50+ (or marked Vitalício) do NOT expire!
  */
 export function validatePassportExpiry(
   expiryStr: string,
@@ -544,7 +634,7 @@ export function validatePassportExpiry(
     };
   }
 
-  // 2. Mozambican Senior citizen check (Age 60+)
+  // 2. Mozambican Senior citizen check (Age 50+)
   if (travelerContext) {
     const seniorCheck = isMozambicanSenior({
       ...travelerContext,
@@ -552,14 +642,14 @@ export function validatePassportExpiry(
     });
 
     if (seniorCheck.isSenior) {
-      // If expiry is empty, or explicitly Vitalício, or if it's a Mozambican ID for 60+
+      // If expiry is empty, or explicitly Vitalício, or if it's a Mozambican ID for 50+
       if (!expiryStr || expiryStr.trim() === '' || isLifetimeExpiry(expiryStr)) {
         return {
           isValid: true,
           isLifetime: true,
           isMozambicanSenior: true,
           formattedValue: 'VITALÍCIO',
-          badgeLabel: 'Vitalício (Mozambique ID 60+)',
+          badgeLabel: 'Vitalício (Mozambique ID 50+)',
           warning: undefined
         };
       }
@@ -577,7 +667,7 @@ export function validatePassportExpiry(
   });
 
   if (!res.isValid) {
-    // If it's a Mozambican senior with text in expiry that didn't parse as date
+    // If it's a Mozambican citizen 50+ with text in expiry that didn't parse as date
     if (travelerContext && isMozambican(travelerContext.nationality)) {
       const seniorCheck = isMozambicanSenior(travelerContext);
       if (seniorCheck.isSenior) {
@@ -586,7 +676,7 @@ export function validatePassportExpiry(
           isLifetime: true,
           isMozambicanSenior: true,
           formattedValue: 'VITALÍCIO',
-          badgeLabel: 'Vitalício (Mozambique ID 60+)'
+          badgeLabel: 'Vitalício (Mozambique ID 50+)'
         };
       }
     }
@@ -599,7 +689,7 @@ export function validatePassportExpiry(
   const expDate = res.parsedDate!;
   expDate.setHours(0, 0, 0, 0);
 
-  // If expired according to date, but traveler is Mozambican senior (60+)
+  // If expired according to date, but traveler is Mozambican 50+ (Vitalício)
   if (expDate < today) {
     if (travelerContext && isMozambican(travelerContext.nationality)) {
       const seniorCheck = isMozambicanSenior(travelerContext);
@@ -609,7 +699,7 @@ export function validatePassportExpiry(
           isLifetime: true,
           isMozambicanSenior: true,
           formattedValue: formatToStandardDate(expDate, 'dob'),
-          warning: `Mozambican ID (${seniorCheck.age} yrs): National ID is Vitalício for seniors (does not expire).`,
+          warning: `Mozambican ID (${seniorCheck.age} yrs): National ID is Vitalício (valid for life for citizens 50+).`,
           parsedDate: expDate
         };
       }

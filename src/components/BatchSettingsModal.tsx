@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TravelerRecord, PurposeOfTrip } from '../types';
-import { X, Check, SlidersHorizontal, Sparkles, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { X, Check, SlidersHorizontal, Sparkles, Calendar, Clock, AlertCircle, Shield } from 'lucide-react';
 import {
   validateDate,
   validateTime,
@@ -36,6 +36,7 @@ export interface BatchSettings {
   accommodationNotes?: string;
   signatureDate?: string;
   signatureName?: string;
+  applyMozambiqueIdValidityByAge?: boolean;
 }
 
 export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
@@ -137,6 +138,7 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
   const [applySignatureDate, setApplySignatureDate] = useState(true);
   const [applySignatureName, setApplySignatureName] = useState(true);
   const [applyRotation, setApplyRotation] = useState(true);
+  const [applyMozIdValidity, setApplyMozIdValidity] = useState(false);
 
   // Validations
   const flightDateValidation = useMemo(() => validateDate(flightDate, 'Flight Date'), [flightDate]);
@@ -179,6 +181,9 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
       settings.finalDestination = finalDestination;
       settings.rotationType = rotationType;
       settings.purposeOfTrip = purposeOfTrip;
+    }
+    if (applyMozIdValidity) {
+      settings.applyMozambiqueIdValidityByAge = true;
     }
 
     onApplyBatchSettings(settings);
@@ -567,6 +572,32 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Mozambique ID Validity by Age Batch Section */}
+          <div className="p-4 rounded-xl border border-indigo-900/40 bg-indigo-950/20 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-xs font-semibold text-indigo-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={applyMozIdValidity}
+                  onChange={e => setApplyMozIdValidity(e.target.checked)}
+                  className="rounded accent-indigo-500 focus:ring-indigo-500"
+                />
+                <Shield className="w-4 h-4 text-indigo-400" />
+                Auto-calculate Mozambique ID Expiry Date by Age
+              </label>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono">
+                Legal Rules
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-400 pl-6">
+              Automatically calculates and applies ID expiry for Mozambican travelers based on their Date of Birth:
+              <br />
+              <span className="text-zinc-300 font-medium">• Under 40: <strong>5 Years</strong></span> |{' '}
+              <span className="text-zinc-300 font-medium">• 40 to 49: <strong>10 Years</strong></span> |{' '}
+              <span className="text-zinc-300 font-medium">• 50+: <strong>Vitalício (Lifetime)</strong></span>
+            </p>
           </div>
         </div>
 

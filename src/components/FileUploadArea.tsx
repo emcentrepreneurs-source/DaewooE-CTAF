@@ -260,7 +260,7 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
           <button
             id="load-sample-btn"
             onClick={handleLoadSampleData}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-medium text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/60 px-3.5 py-2 rounded-lg border border-indigo-700/60 transition-colors"
+            className="hidden"
             title="Populate table with 12 real-world styled CCS JV traveler records"
           >
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />

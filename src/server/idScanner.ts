@@ -313,7 +313,11 @@ CRITICAL EXTRACTION GUIDELINES:
    - "Nomes": Given names.
    - "Data de Nascimento": Date of birth.
    - "Data de Validade" or "Válido até": Expiry date.
-   - CRITICAL FOR OLDER AGE CITIZENS (Age 60+): Under Mozambican law, National ID cards (BI) issued to senior citizens (aged 60 and above) do NOT expire (marked as "VITALÍCIO", "Vitalício", or left without an expiry date). If the document indicates Vitalício, or if the citizen is Mozambican and aged 60+ with no expiry date on their BI, return "passportExpiryDate": "VITALÍCIO".
+   - VALIDITY PERIODS BY AGE (Under Mozambican Law for Bilhete de Identidade / BI):
+     * Under 40 years old: Valid for 5 years.
+     * 40 to 49 years old: Valid for 10 years.
+     * 50 years and older: Valid for life (Vitalício / Lifetime, no expiry date required).
+     If the document indicates Vitalício, or if the citizen is Mozambican and aged 50+ with no expiry date on their BI, return "passportExpiryDate": "VITALÍCIO". If missing on an under-50 citizen BI, calculate 5 years (under 40) or 10 years (40-49) from issue/birth year.
 
 4. COMPANY & PROJECT DEFAULTS (For CCS JV / Mozambique LNG Site):
    - Company: If DAEWOO, SAIPEM, CCS JV, TOTALENERGIES, or contractor is visible, extract it; default "DAEWOO".
@@ -432,15 +436,17 @@ Return a JSON object conforming strictly to this structure:
       let isExpired = false;
       let isExpiringSoon = false;
 
-      // Check if senior citizen Mozambican ID (Age 60+)
+      // Check if senior citizen Mozambican ID (Age 50+)
+      const isMoz = (nationality || '').toUpperCase().includes('MOZ') || nationality === 'MOZAMBICAN';
       let isMozSenior = false;
-      if (nationality === 'MOZAMBICAN' && dateOfBirth) {
+      if (isMoz && dateOfBirth) {
         const parts = dateOfBirth.split('-');
         if (parts.length === 3) {
           const yy = parseInt(parts[2], 10);
           const birthYear = yy < 50 ? 2000 + yy : 1900 + yy;
           const currentYear = new Date().getFullYear();
-          if (currentYear - birthYear >= 60) {
+          const age = currentYear - birthYear;
+          if (age >= 50) {
             isMozSenior = true;
           }
         }
@@ -452,10 +458,26 @@ Return a JSON object conforming strictly to this structure:
         (isMozSenior && (!passportExpiryDate || passportExpiryDate === '01-Jan-32'))
       ) {
         effectivePassportExpiryDate = 'VITALÍCIO';
+      } else if (isMoz && (!passportExpiryDate || passportExpiryDate === '01-Jan-32') && parsed.dateOfBirth) {
+        // Auto-calculate validity based on age: Under 40 (5 yrs), 40-49 (10 yrs), 50+ (Vitalício)
+        const parts = String(parsed.dateOfBirth).split(/[-/.]/);
+        if (parts.length === 3) {
+          const yy = parseInt(parts[2], 10);
+          const birthYear = yy < 50 ? 2000 + yy : 1900 + yy;
+          const currentYear = new Date().getFullYear();
+          const age = currentYear - birthYear;
+          if (age >= 50) {
+            effectivePassportExpiryDate = 'VITALÍCIO';
+          } else {
+            const validityYears = age >= 40 ? 10 : 5;
+            const targetYear = (currentYear + validityYears) % 100;
+            effectivePassportExpiryDate = `${parts[0]}-${parts[1]}-${String(targetYear).padStart(2, '0')}`;
+          }
+        }
       }
 
       if (effectivePassportExpiryDate === 'VITALÍCIO') {
-        checksPassed.push('Mozambique National ID: Senior (60+) / Vitalício Lifetime ID (No Expiry Date)');
+        checksPassed.push('Mozambique National ID: Senior (50+) / Vitalício Lifetime ID (No Expiry Date)');
       } else if (effectivePassportExpiryDate) {
         // Parse expiry year/month
         const parts = effectivePassportExpiryDate.split('-');

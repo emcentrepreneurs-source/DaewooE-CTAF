@@ -1,6 +1,10 @@
 import * as XLSX from 'xlsx';
 import { TravelerRecord, FlightEntry, AccommodationEntry, PurposeOfTrip } from '../types';
-import { validateTravelerDatesAndTimes } from './dateTimeValidation';
+import {
+  validateTravelerDatesAndTimes,
+  getMozambiqueIdValidityByAge,
+  isMozambican
+} from './dateTimeValidation';
 
 // Helper to normalize strings for comparison
 function cleanStr(val: any): string {
@@ -151,7 +155,15 @@ export function parseExcelFile(data: ArrayBuffer | Uint8Array): {
     const dateOfBirth = formatExcelDate(rawDob, 'dob');
     const nationality = findRowValue(row, ['NATIONALITY', 'Nacionalidade', 'Country']) || 'MOZAMBICAN';
     const rawExp = findRowValue(row, ['PASSPORT EXPIRY DATE', 'EXPIRY DATE', 'Passport Expiry', 'Data de Validade']);
-    const passportExpiryDate = formatExcelDate(rawExp, 'dob');
+    let passportExpiryDate = formatExcelDate(rawExp, 'dob');
+
+    // Auto-calculate Mozambique National ID (BI) validity by age if missing
+    if (!passportExpiryDate && isMozambican(nationality) && dateOfBirth) {
+      const mozVal = getMozambiqueIdValidityByAge(dateOfBirth);
+      if (mozVal) {
+        passportExpiryDate = mozVal.expiryDate;
+      }
+    }
 
     // Flight details
     const rawFlightDate = findRowValue(row, ['FLIGHT DATE', 'DATE', 'Departure Date', 'Data do Voo']);

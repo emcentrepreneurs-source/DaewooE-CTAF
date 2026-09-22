@@ -32,7 +32,9 @@ import {
   calculateAge,
   isMozambicanSenior,
   isLifetimeExpiry,
-  isMozambican
+  isMozambican,
+  getMozambiqueIdValidityByAge,
+  MozIdValidityResult
 } from '../utils/dateTimeValidation';
 import { MaskedPhoneInput } from './MaskedPhoneInput';
 import { MaskedPassportInput } from './MaskedPassportInput';
@@ -289,6 +291,15 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
 
   const primaryAcc = accommodationList[0];
 
+  // Mozambican National ID validity calculation by age rules
+  // (Under 40: 5 yrs, 40 to 49: 10 yrs, 50+: Vitalício)
+  const mozValidity: MozIdValidityResult | null = useMemo(() => {
+    if (isMozambican(formData.nationality) || !formData.nationality) {
+      return getMozambiqueIdValidityByAge(formData.dateOfBirth, { flightDate: primaryFlight.date });
+    }
+    return null;
+  }, [formData.nationality, formData.dateOfBirth, primaryFlight.date]);
+
   // Real-time validations
   const dobValidation = useMemo(() => validateDateOfBirth(formData.dateOfBirth), [formData.dateOfBirth]);
   const isSeniorMozambican = useMemo(
@@ -317,6 +328,36 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
     [formData]
   );
 
+  // Automatically compute and update Mozambique ID expiry date when DOB changes
+  const handleDateOfBirthChange = (newDob: string, autoApplyMozRule: boolean = true) => {
+    setFormData(prev => {
+      const updated = { ...prev, dateOfBirth: newDob };
+      if (autoApplyMozRule && (isMozambican(prev.nationality) || !prev.nationality)) {
+        const mozRule = getMozambiqueIdValidityByAge(newDob, { flightDate: primaryFlight.date });
+        if (mozRule) {
+          updated.passportExpiryDate = mozRule.expiryDate;
+        }
+      }
+      return updated;
+    });
+  };
+
+  // Handle nationality change and auto-populate Mozambique validity if appropriate
+  const handleNationalityChange = (newNationality: string) => {
+    setFormData(prev => {
+      const updated = { ...prev, nationality: newNationality };
+      if (isMozambican(newNationality) && prev.dateOfBirth) {
+        const mozRule = getMozambiqueIdValidityByAge(prev.dateOfBirth, { flightDate: primaryFlight.date });
+        if (mozRule) {
+          if (!prev.passportExpiryDate || prev.passportExpiryDate === '01-Jan-32' || !validatePassportExpiry(prev.passportExpiryDate).isValid) {
+            updated.passportExpiryDate = mozRule.expiryDate;
+          }
+        }
+      }
+      return updated;
+    });
+  };
+
   // Auto-normalize all date, time, phone, and passport formats
   const handleAutoFormatAll = () => {
     setFormData(prev => {
@@ -340,6 +381,8 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
       // Passport Exp
       if (isLifetimeExpiry(updated.passportExpiryDate) || (isSeniorMozambican.isSenior && (!updated.passportExpiryDate || updated.passportExpiryDate.trim() === ''))) {
         updated.passportExpiryDate = 'VITALÍCIO';
+      } else if (mozValidity && (isMozambican(updated.nationality) || !updated.nationality)) {
+        updated.passportExpiryDate = mozValidity.expiryDate;
       } else if (passportExpValidation.parsedDate) {
         updated.passportExpiryDate = formatToStandardDate(passportExpValidation.parsedDate, 'dob');
       }
@@ -636,7 +679,7 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
                           formData.dateOfBirth,
                           'dob',
                           'dob',
-                          val => handleChange('dateOfBirth', val)
+                          val => handleDateOfBirthChange(val)
                         )
                       }
                       title="Open Scroll Wheel / Drum Date Picker for Date of Birth"
@@ -648,7 +691,7 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
                     type="text"
                     placeholder="DD-MMM-YY (e.g. 12-Aug-90)"
                     value={formData.dateOfBirth}
-                    onChange={e => handleChange('dateOfBirth', e.target.value)}
+                    onChange={e => handleDateOfBirthChange(e.target.value)}
                     className={`w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono ${
                       !dobValidation.isValid
                         ? 'border-rose-500 text-rose-200 focus:border-rose-500'
@@ -665,7 +708,7 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
                     onChange={e => {
                       if (e.target.value) {
                         const parsed = new Date(e.target.value + 'T00:00:00');
-                        handleChange('dateOfBirth', formatToStandardDate(parsed, 'dob'));
+                        handleDateOfBirthChange(formatToStandardDate(parsed, 'dob'));
                       }
                     }}
                   />
@@ -686,7 +729,7 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
                 <input
                   type="text"
                   value={formData.nationality}
-                  onChange={e => handleChange('nationality', e.target.value)}
+                  onChange={e => handleNationalityChange(e.target.value)}
                   className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
@@ -781,11 +824,130 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
                     title="Set this Mozambique National ID as Vitalício (non-expiring for senior citizen / lifetime)"
                   >
                     <Shield className="w-3 h-3 text-emerald-400" />
-                    <span>Set as Vitalício (Mozambique ID does not expire for 60+)</span>
+                    <span>Set as Vitalício (Mozambique ID does not expire for 50+)</span>
                   </button>
                 )}
               </div>
             </div>
+
+            {/* MOZAMBIQUE NATIONAL ID (BI) VALIDITY RULES BANNER */}
+            {(isMozambican(formData.nationality) || !formData.nationality) && (
+              <div className="mt-3 p-3 bg-zinc-900/90 rounded-xl border border-indigo-900/40 shadow-sm space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <div>
+                      <span className="text-xs font-semibold text-zinc-100 flex items-center gap-1.5">
+                        Mozambique National ID (BI) Validity Rules by Age
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono">
+                          Auto-Calculate Active
+                        </span>
+                      </span>
+                      <p className="text-[10px] text-zinc-400">
+                        Entering Date of Birth automatically computes and sets the legal expiry date.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Buttons */}
+                  <div className="flex items-center flex-wrap gap-1.5">
+                    {mozValidity && !mozValidity.isLifetime && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleChange('passportExpiryDate', mozValidity.expiryDate)}
+                          className="px-2.5 py-1 text-[11px] font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
+                          title="Apply rule from Birth Day & Month"
+                        >
+                          Auto {mozValidity.validityYears}y: {mozValidity.expiryDate}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleChange('passportExpiryDate', mozValidity.expiryDateFromToday)}
+                          className="px-2.5 py-1 text-[11px] font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg transition-colors cursor-pointer"
+                          title="Apply rule from today's date"
+                        >
+                          From Today: {mozValidity.expiryDateFromToday}
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleChange('passportExpiryDate', 'VITALÍCIO')}
+                      className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
+                        isLifetime
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-300 border border-emerald-800/70'
+                      }`}
+                      title="Set as Vitalício (non-expiring for 50+ / lifetime)"
+                    >
+                      <Shield className="w-3.5 h-3.5" />
+                      Set Vitalício
+                    </button>
+                  </div>
+                </div>
+
+                {/* The 3 rule tiers with dynamic highlighting */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-zinc-800/80">
+                  <div
+                    className={`p-2 rounded-lg border text-[11px] transition-all ${
+                      mozValidity?.ageGroup === 'UNDER_40'
+                        ? 'bg-emerald-950/40 border-emerald-500/60 text-emerald-200'
+                        : 'bg-zinc-950/40 border-zinc-800/80 text-zinc-400'
+                    }`}
+                  >
+                    <div className="font-semibold flex items-center justify-between">
+                      <span>Under 40 years old</span>
+                      <span className="font-mono px-1 py-0.2 rounded bg-indigo-500/10 text-indigo-300 text-[10px]">5 Years</span>
+                    </div>
+                    <div className="text-[10px] text-zinc-400 mt-0.5">
+                      Valid for 5 years
+                    </div>
+                  </div>
+
+                  <div
+                    className={`p-2 rounded-lg border text-[11px] transition-all ${
+                      mozValidity?.ageGroup === '40_TO_49'
+                        ? 'bg-emerald-950/40 border-emerald-500/60 text-emerald-200'
+                        : 'bg-zinc-950/40 border-zinc-800/80 text-zinc-400'
+                    }`}
+                  >
+                    <div className="font-semibold flex items-center justify-between">
+                      <span>40 to 49 years old</span>
+                      <span className="font-mono px-1 py-0.2 rounded bg-indigo-500/10 text-indigo-300 text-[10px]">10 Years</span>
+                    </div>
+                    <div className="text-[10px] text-zinc-400 mt-0.5">
+                      Valid for 10 years
+                    </div>
+                  </div>
+
+                  <div
+                    className={`p-2 rounded-lg border text-[11px] transition-all ${
+                      mozValidity?.ageGroup === '50_AND_OLDER'
+                        ? 'bg-emerald-950/40 border-emerald-500/60 text-emerald-200'
+                        : 'bg-zinc-950/40 border-zinc-800/80 text-zinc-400'
+                    }`}
+                  >
+                    <div className="font-semibold flex items-center justify-between">
+                      <span>50 years and older</span>
+                      <span className="font-mono px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[10px]">Vitalício</span>
+                    </div>
+                    <div className="text-[10px] text-zinc-400 mt-0.5">
+                      Valid for life (no expiry)
+                    </div>
+                  </div>
+                </div>
+
+                {mozValidity && (
+                  <div className="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5 pt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>
+                      Matched Traveler: Age {mozValidity.age} ➔ {mozValidity.ruleDescription} (Auto-Set: <strong className="font-mono">{mozValidity.expiryDate}</strong>)
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
               <div>

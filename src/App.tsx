@@ -16,6 +16,7 @@ import { IdPassportScannerModal } from './components/IdPassportScannerModal';
 import { SignatureAutomationModal } from './components/SignatureAutomationModal';
 import { Toast, ToastMessage } from './components/Toast';
 import { recordActivityLog } from './utils/activityLogger';
+import { getMozambiqueIdValidityByAge, isMozambican } from './utils/dateTimeValidation';
 import {
   FileSpreadsheet,
   FileCheck,
@@ -418,6 +419,18 @@ export default function App() {
           notes: settings.accommodationNotes || acc[0]?.notes || 'SHARED'
         };
         updated.accommodation = acc;
+      }
+
+      // Mozambique ID validity calculation by age (Under 40: 5y, 40-49: 10y, 50+: Vitalício)
+      if (settings.applyMozambiqueIdValidityByAge) {
+        if ((isMozambican(updated.nationality) || !updated.nationality) && updated.dateOfBirth) {
+          const mozRule = getMozambiqueIdValidityByAge(updated.dateOfBirth, {
+            flightDate: updated.flights?.[0]?.date
+          });
+          if (mozRule) {
+            updated.passportExpiryDate = mozRule.expiryDate;
+          }
+        }
       }
 
       return updated;
