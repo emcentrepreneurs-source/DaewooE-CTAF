@@ -23,6 +23,43 @@ export interface AccommodationEntry {
   notes: string;
 }
 
+export interface MobilizationRouteEntry {
+  date: string;
+  origin: string;
+  etd: string;
+  destination: string;
+  eta: string;
+}
+
+export interface MobilizationAdminCheck {
+  mark: string; // e.g. "YES", "OK", or "X"
+  name: string;
+  signature?: string;
+  signatureDate?: string;
+}
+
+export interface MobilizationFormData {
+  formDate: string; // e.g. "12-Mar-2026"
+  applicantName: string; // e.g. "VANIA GUAMBE"
+  position: string; // e.g. "ADMIN. SECRETARY"
+  department: string; // e.g. "ADMIN."
+  site: string; // e.g. "OPBL1"
+  nationality: string; // e.g. "MOZAMBIQUE"
+  idNumber: string; // e.g. "090102539504P"
+  arrivalDate: string; // e.g. "12-Mar-2026"
+  pmApproval: string; // default "N/A"
+  signatureName?: string; // Same signature name as TAF (e.g. "Eric Matola")
+  signatureImage?: string; // Same signature image as TAF (base64)
+  signatureDate?: string; // Same signature date as TAF (e.g. "06 AUGUST 2026")
+  routes: MobilizationRouteEntry[];
+  isCustomRoute?: boolean; // When true, route is customized independently from TAF
+  originProvince?: string;
+  destinationProvince?: string;
+  check1: MobilizationAdminCheck;
+  check2: MobilizationAdminCheck;
+  check3: MobilizationAdminCheck;
+}
+
 export interface TravelerRecord {
   id: string;
   // Section 1: Traveler Information
@@ -58,6 +95,9 @@ export interface TravelerRecord {
   signatureName?: string; // name to render
   signatureImage?: string; // base64 or drawn svg/dataUrl
   
+  // Daewoo E&C Mobilization Form Data (Generated alongside TAF)
+  mobilizationForm?: MobilizationFormData;
+
   // Validation status
   isValid?: boolean;
   validationErrors?: string[];

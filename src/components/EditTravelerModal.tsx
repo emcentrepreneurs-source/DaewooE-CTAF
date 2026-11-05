@@ -17,8 +17,12 @@ import {
   Plus,
   Trash2,
   ArrowRightLeft,
-  Shield
+  Shield,
+  Building2
 } from 'lucide-react';
+import { MozambiqueProvincePicker } from './MozambiqueProvincePicker';
+import { MozambiqueAirportPicker } from './MozambiqueAirportPicker';
+import { extractMobilizationDataFromTraveler } from '../utils/mobilizationDataExtractor';
 import {
   validateDateOfBirth,
   validatePassportExpiry,
@@ -558,15 +562,11 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-                  FINAL DESTINATION
-                </label>
-                <input
-                  type="text"
+                <MozambiqueProvincePicker
+                  label="FINAL DESTINATION / SITE"
                   value={formData.finalDestination}
-                  onChange={e => handleChange('finalDestination', e.target.value)}
-                  placeholder="e.g. Afungi / Pemba / Maputo"
-                  className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  onSelect={loc => handleChange('finalDestination', loc.toUpperCase())}
+                  placeholder="Select Site (OPBL1, Afungi, Pemba, Maputo)..."
                 />
               </div>
             </div>
@@ -1088,31 +1088,23 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
                         )}
                       </div>
 
-                      {/* FROM */}
+                      {/* FROM (AIRPORT WITH SCROLL UP/DOWN) */}
                       <div>
-                        <label className="block text-[10px] font-medium text-zinc-400 mb-1">
-                          FROM
-                        </label>
-                        <input
-                          type="text"
+                        <MozambiqueAirportPicker
+                          label="FROM (AIRPORT)"
                           value={flt.from}
-                          onChange={e => handleFlightChange(idx, 'from', e.target.value)}
+                          onSelect={loc => handleFlightChange(idx, 'from', loc.toUpperCase())}
                           placeholder="e.g. PEMBA"
-                          className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
                         />
                       </div>
 
-                      {/* TO */}
+                      {/* TO (AIRPORT WITH SCROLL UP/DOWN) */}
                       <div>
-                        <label className="block text-[10px] font-medium text-zinc-400 mb-1">
-                          TO
-                        </label>
-                        <input
-                          type="text"
+                        <MozambiqueAirportPicker
+                          label="TO (AIRPORT)"
                           value={flt.to}
-                          onChange={e => handleFlightChange(idx, 'to', e.target.value)}
+                          onSelect={loc => handleFlightChange(idx, 'to', loc.toUpperCase())}
                           placeholder="e.g. AFUNGI"
-                          className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
                         />
                       </div>
 
@@ -1614,6 +1606,123 @@ export const EditTravelerModal: React.FC<EditTravelerModalProps> = ({
                   onChange={e => handleChange('signatureName', e.target.value)}
                   className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500 font-serif italic"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 5: Daewoo E&C Mobilization Form - Independent Route & Site */}
+          <div className="pt-4 border-t border-zinc-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                  5. Daewoo E&amp;C Mobilization Form - Route &amp; Site (Separate Print)
+                </h4>
+              </div>
+              <span className="text-[10px] text-zinc-400 font-mono">
+                Prints as a separate legal sheet
+              </span>
+            </div>
+
+            <div className="p-3.5 bg-zinc-950/70 border border-emerald-900/40 rounded-xl space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-xs font-medium text-zinc-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.mobilizationForm?.isCustomRoute}
+                    onChange={e => {
+                      const isCustom = e.target.checked;
+                      setFormData(prev => {
+                        const currentMob = prev.mobilizationForm || extractMobilizationDataFromTraveler(prev);
+                        return {
+                          ...prev,
+                          mobilizationForm: {
+                            ...currentMob,
+                            isCustomRoute: isCustom
+                          }
+                        };
+                      });
+                    }}
+                    className="rounded accent-emerald-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span>Customize Route location (not the same as TAF)</span>
+                </label>
+
+                <span className="text-[10px] text-zinc-400 font-mono">
+                  Scroll ▲/▼ for all Mozambican airports
+                </span>
+              </div>
+
+              {/* Mobilization Site & Route Pickers with Scroll Up / Down */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                <div>
+                  <MozambiqueAirportPicker
+                    label="MOBILIZATION SITE / BASE"
+                    value={formData.mobilizationForm?.site || formData.finalDestination || 'OPBL1'}
+                    onSelect={loc => {
+                      setFormData(prev => {
+                        const currentMob = prev.mobilizationForm || extractMobilizationDataFromTraveler(prev);
+                        return {
+                          ...prev,
+                          mobilizationForm: {
+                            ...currentMob,
+                            site: loc.toUpperCase(),
+                            isCustomRoute: true
+                          }
+                        };
+                      });
+                    }}
+                    placeholder="e.g. OPBL1, Afungi, Palma..."
+                  />
+                </div>
+
+                <div>
+                  <MozambiqueAirportPicker
+                    label="MOBILIZATION ORIGIN (AIRPORT)"
+                    value={formData.mobilizationForm?.routes?.[0]?.origin || formData.flights?.[0]?.from || 'MAPUTO'}
+                    onSelect={loc => {
+                      setFormData(prev => {
+                        const currentMob = prev.mobilizationForm || extractMobilizationDataFromTraveler(prev);
+                        const newRoutes = [...currentMob.routes];
+                        if (!newRoutes[0]) newRoutes[0] = { date: '', origin: '', etd: '', destination: '', eta: '' };
+                        newRoutes[0] = { ...newRoutes[0], origin: loc.toUpperCase() };
+                        return {
+                          ...prev,
+                          mobilizationForm: {
+                            ...currentMob,
+                            isCustomRoute: true,
+                            routes: newRoutes
+                          }
+                        };
+                      });
+                    }}
+                    placeholder="e.g. MAPUTO, BEIRA, PEMBA..."
+                  />
+                </div>
+
+                <div>
+                  <MozambiqueAirportPicker
+                    label="MOBILIZATION DESTINATION (AIRPORT)"
+                    value={formData.mobilizationForm?.routes?.[0]?.destination || formData.flights?.[0]?.to || 'PEMBA'}
+                    onSelect={loc => {
+                      setFormData(prev => {
+                        const currentMob = prev.mobilizationForm || extractMobilizationDataFromTraveler(prev);
+                        const newRoutes = [...currentMob.routes];
+                        if (!newRoutes[0]) newRoutes[0] = { date: '', origin: '', etd: '', destination: '', eta: '' };
+                        newRoutes[0] = { ...newRoutes[0], destination: loc.toUpperCase() };
+                        return {
+                          ...prev,
+                          mobilizationForm: {
+                            ...currentMob,
+                            isCustomRoute: true,
+                            routes: newRoutes
+                          }
+                        };
+                      });
+                    }}
+                    placeholder="e.g. PEMBA, AFUNGI, NACALA..."
+                  />
+                </div>
               </div>
             </div>
           </div>

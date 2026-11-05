@@ -4,7 +4,9 @@ import { downloadSinglePdf } from '../utils/zipExporter';
 import { downloadTravelersExcel } from '../utils/sampleData';
 import { CCS_JV_LOGO_BASE64 } from '../assets/logo';
 import { ERIC_MATOLA_SIGNATURE_BASE64, DEFAULT_SIGNATURE_NAME } from '../assets/signature';
-import { Download, Printer, ZoomIn, ZoomOut, RotateCcw, Edit3, Check, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { Download, Printer, ZoomIn, ZoomOut, RotateCcw, Edit3, Check, ChevronLeft, ChevronRight, FileSpreadsheet, Building2, FileCheck2 } from 'lucide-react';
+import { MobilizationFormPreview } from './MobilizationFormPreview';
+import { downloadSingleMobilizationPdf } from '../utils/mobilizationPdfGenerator';
 
 interface TafFormPreviewProps {
   traveler: TravelerRecord;
@@ -12,6 +14,7 @@ interface TafFormPreviewProps {
   currentIndex?: number;
   onNavigate?: (index: number) => void;
   onEdit?: (traveler: TravelerRecord) => void;
+  onOpenMobilizationModal?: (traveler: TravelerRecord) => void;
 }
 
 export const TafFormPreview: React.FC<TafFormPreviewProps> = ({
@@ -19,9 +22,26 @@ export const TafFormPreview: React.FC<TafFormPreviewProps> = ({
   totalCount = 1,
   currentIndex = 0,
   onNavigate,
-  onEdit
+  onEdit,
+  onOpenMobilizationModal
 }) => {
   const [scale, setScale] = useState<number>(0.9);
+  const [activeForm, setActiveForm] = useState<'taf' | 'mobilization'>('taf');
+  const [printSeparateMob, setPrintSeparateMob] = useState<boolean>(true);
+
+  if (activeForm === 'mobilization') {
+    return (
+      <MobilizationFormPreview
+        traveler={traveler}
+        totalCount={totalCount}
+        currentIndex={currentIndex}
+        onNavigate={onNavigate}
+        onEdit={onEdit}
+        onOpenMobilizationModal={onOpenMobilizationModal}
+        onSwitchToTaf={() => setActiveForm('taf')}
+      />
+    );
+  }
 
   const handlePrint = () => {
     window.print();
@@ -92,6 +112,48 @@ export const TafFormPreview: React.FC<TafFormPreviewProps> = ({
           </span>
         </div>
 
+        {/* Form Selector Tabs (TAF vs Mobilization) */}
+        <div className="flex items-center bg-zinc-800 p-0.5 rounded-lg border border-zinc-700">
+          <button
+            type="button"
+            onClick={() => setActiveForm('taf')}
+            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 cursor-pointer ${
+              activeForm === 'taf'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <FileCheck2 className="w-3.5 h-3.5" />
+            TAF Form (CCS JV)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveForm('mobilization')}
+            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 cursor-pointer ${
+              activeForm === 'mobilization'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+            Mobilization Form
+          </button>
+        </div>
+
+        {/* Separate Print Tick Checkbox Option */}
+        <label className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-800/90 hover:bg-zinc-800 px-2.5 py-1.5 rounded-lg border border-zinc-700 cursor-pointer select-none transition-colors">
+          <input
+            type="checkbox"
+            checked={printSeparateMob}
+            onChange={e => setPrintSeparateMob(e.target.checked)}
+            className="rounded accent-emerald-500 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+          />
+          <span className="text-zinc-300 text-[11px] flex items-center gap-1">
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+            Print Mobilization separately
+          </span>
+        </label>
+
         {/* Controls */}
         <div className="flex items-center gap-2 ml-auto">
           {/* Zoom */}
@@ -153,16 +215,28 @@ export const TafFormPreview: React.FC<TafFormPreviewProps> = ({
             title="Download Excel spreadsheet template populated with this traveler's details"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Download Excel</span>
+            <span>Excel</span>
+          </button>
+
+          {/* Download Separate Mobilization Form PDF */}
+          <button
+            id="preview-download-mob-pdf-btn"
+            onClick={() => downloadSingleMobilizationPdf(traveler)}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
+            title="Download separate Daewoo E&C Mobilization Form PDF"
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Mobilization PDF</span>
           </button>
 
           <button
             id="preview-download-pdf-btn"
             onClick={() => downloadSinglePdf(traveler)}
             className="flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-lg hover:shadow-indigo-500/20 transition-all"
+            title="Download CCS JV Travel Authorization Form (TAF) PDF"
           >
             <Download className="w-3.5 h-3.5" />
-            Download PDF
+            TAF PDF
           </button>
         </div>
       </div>

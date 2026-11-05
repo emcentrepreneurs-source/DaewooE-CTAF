@@ -7,6 +7,8 @@ interface HeaderProps {
   readyCount: number;
   currentUser?: string;
   dbSyncStatus?: 'synced' | 'saving' | 'error';
+  activeTab?: 'manifest' | 'taf-preview' | 'mobilization-preview';
+  onSelectTab?: (tab: 'manifest' | 'taf-preview' | 'mobilization-preview') => void;
   onOpenDatabaseModal?: () => void;
   onOpenSignatureModal?: () => void;
   onLogout?: () => void;
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({
   readyCount,
   currentUser = 'AdminE&C',
   dbSyncStatus = 'synced',
+  activeTab = 'manifest',
+  onSelectTab,
   onOpenDatabaseModal,
   onOpenSignatureModal,
   onLogout
@@ -77,6 +81,42 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
+        {/* Navigation Tabs (Desktop) */}
+        {onSelectTab && (
+          <nav className="hidden lg:flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+            <button
+              onClick={() => onSelectTab('manifest')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                activeTab === 'manifest'
+                  ? 'bg-zinc-800 text-white shadow-sm font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+              }`}
+            >
+              Manifest Table
+            </button>
+            <button
+              onClick={() => onSelectTab('taf-preview')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                activeTab === 'taf-preview'
+                  ? 'bg-indigo-600 text-white shadow-sm font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+              }`}
+            >
+              TAF Forms
+            </button>
+            <button
+              onClick={() => onSelectTab('mobilization-preview')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                activeTab === 'mobilization-preview'
+                  ? 'bg-emerald-600 text-white shadow-sm font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+              }`}
+            >
+              Mobilization Forms
+            </button>
+          </nav>
+        )}
+
         {/* Info Badges & User Profile */}
         <div className="hidden md:flex items-center gap-2.5 text-xs">
           {/* Signature & Automation Code Hub Button */}
@@ -85,35 +125,28 @@ export const Header: React.FC<HeaderProps> = ({
               id="header-signature-automation-btn"
               onClick={onOpenSignatureModal}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 rounded-lg transition-all font-medium cursor-pointer shadow-sm"
-              title="Configure automated signature appending and view Python & Google Docs API scripts"
+              title="Configure official electronic signature and view automation scripts"
             >
               <FileSignature className="w-3.5 h-3.5 text-indigo-400" />
               <span>Signatures</span>
             </button>
           )}
 
-          <div className="flex items-center gap-2 bg-zinc-800/80 border border-zinc-700/80 px-3 py-1.5 rounded-lg">
+          <div className="flex items-center gap-1.5 bg-zinc-800/80 border border-zinc-700/80 px-2.5 py-1.5 rounded-lg">
             <Building2 className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="text-zinc-400">Project:</span>
-            <span className="font-semibold text-zinc-200">Mozambique LNG</span>
+            <span className="text-zinc-400">Site:</span>
+            <span className="font-semibold text-zinc-200">Afungi / OPBL1</span>
           </div>
 
-          {totalTravelers > 0 && (
-            <div className="flex items-center gap-2 bg-indigo-950/60 border border-indigo-800/60 px-3 py-1.5 rounded-lg">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="text-indigo-200 font-bold">{readyCount} of {totalTravelers} Ready</span>
-            </div>
-          )}
-
           {/* User Profile Badge & Logout */}
-          <div className="flex items-center gap-1.5 pl-2 border-l border-zinc-700/80">
+          <div className="flex items-center gap-1.5 pl-1.5 border-l border-zinc-700/80">
             <div className="flex items-center gap-2 bg-zinc-800/90 border border-zinc-700 px-2.5 py-1.5 rounded-lg">
               <div className="w-5 h-5 rounded-full bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center text-indigo-300">
                 <UserCheck className="w-3 h-3" />
               </div>
               <div className="text-left">
                 <p className="font-semibold text-zinc-200 text-[11px] leading-none">{currentUser}</p>
-                <p className="text-[9.5px] text-zinc-400 leading-tight">Daewoo E&C</p>
+                <p className="text-[9.5px] text-zinc-400 leading-tight">Daewoo E&amp;C</p>
               </div>
             </div>
 

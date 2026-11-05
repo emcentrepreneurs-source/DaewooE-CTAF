@@ -25,9 +25,11 @@ import {
   FileSpreadsheet,
   Download,
   ChevronDown,
-  Check
+  Check,
+  Building2
 } from 'lucide-react';
-import { downloadSinglePdf } from '../utils/zipExporter';
+import { downloadSinglePdf, downloadCombinedMobilization } from '../utils/zipExporter';
+import { downloadSingleMobilizationPdf } from '../utils/mobilizationPdfGenerator';
 import { downloadTravelersExcel, downloadBlankExcelTemplate } from '../utils/sampleData';
 import {
   validateTravelerDatesAndTimes,
@@ -207,15 +209,17 @@ interface TravelersTableProps {
   onToggleSelect: (id: string) => void;
   onSelectAll: (selectAll: boolean) => void;
   onPreviewTraveler: (traveler: TravelerRecord) => void;
+  onViewMobilizationTab?: (traveler: TravelerRecord) => void;
   onEditTraveler: (traveler: TravelerRecord) => void;
   onDeleteTraveler: (id: string) => void;
   onAddTraveler?: () => void;
   onOpenScanner?: () => void;
   onOpenSignatureModal?: () => void;
   onBatchSettings: () => void;
-  onBatchZipDownload: (selectedOnly?: boolean) => void;
+  onBatchZipDownload: (selectedOnly?: boolean, options?: { includeTaf?: boolean; includeMobilization?: boolean }) => void;
   onCombinedPdfDownload: (selectedOnly?: boolean) => void;
   onDownloadExcel?: (selectedOnly?: boolean) => void;
+  onOpenMobilizationModal?: (traveler: TravelerRecord) => void;
   onToast?: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   isProcessingBatch?: boolean;
 }
@@ -226,6 +230,7 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
   onToggleSelect,
   onSelectAll,
   onPreviewTraveler,
+  onViewMobilizationTab,
   onEditTraveler,
   onDeleteTraveler,
   onAddTraveler,
@@ -235,6 +240,7 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
   onBatchZipDownload,
   onCombinedPdfDownload,
   onDownloadExcel,
+  onOpenMobilizationModal,
   onToast,
   isProcessingBatch = false
 }) => {
@@ -245,16 +251,34 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
   const [isExcelMenuOpen, setIsExcelMenuOpen] = useState(false);
   const excelMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close Excel menu on outside click
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [includeTafInZip, setIncludeTafInZip] = useState(true);
+  const [includeMobInZip, setIncludeMobInZip] = useState(true);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on outside click
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (excelMenuRef.current && !excelMenuRef.current.contains(e.target as Node)) {
         setIsExcelMenuOpen(false);
       }
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  const handleCombinedMobilizationDownload = () => {
+    const targetTravelers = selectedIds.length > 0
+      ? travelers.filter(t => selectedIds.includes(t.id))
+      : travelers;
+    downloadCombinedMobilization(targetTravelers);
+    if (onToast) {
+      onToast(`Downloaded combined Mobilization PDF for ${targetTravelers.length} travelers.`, 'success');
+    }
+  };
 
   const handleExportExcel = (selectedOnly: boolean = false) => {
     if (onDownloadExcel) {
@@ -495,39 +519,135 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
               )}
             </div>
 
+            {/* Combined TAF Multi-Page PDF */}
             <button
               id="download-combined-pdf-btn"
               onClick={() => onCombinedPdfDownload(selectedIds.length > 0)}
               disabled={travelers.length === 0 || isProcessingBatch}
-              className="flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg border border-zinc-700 transition-colors disabled:opacity-40"
-              title="Download single combined multi-page PDF document with all travelers"
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg border border-zinc-700 transition-colors disabled:opacity-40 cursor-pointer"
+              title="Download single combined multi-page PDF document with all TAF forms"
             >
-              <Layers className="w-3.5 h-3.5 text-zinc-400" />
-              Combined Multi-page PDF
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              Combined TAF
             </button>
 
+            {/* Combined Mobilization Multi-Page PDF */}
             <button
-              id="generate-all-zip-btn"
-              onClick={() => onBatchZipDownload(selectedIds.length > 0)}
+              id="download-combined-mob-btn"
+              onClick={handleCombinedMobilizationDownload}
               disabled={travelers.length === 0 || isProcessingBatch}
-              className="flex items-center gap-2 text-xs font-medium px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-lg hover:shadow-indigo-500/20 transition-all disabled:opacity-40"
-              title="Generate individual PDF for each traveler and download packaged in ZIP"
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 rounded-lg border border-emerald-800/80 transition-colors disabled:opacity-40 cursor-pointer"
+              title="Download single combined multi-page PDF with all Daewoo E&C Mobilization forms"
             >
-              <FileArchive className="w-4 h-4" />
-              {isProcessingBatch
-                ? 'Processing Batch...'
-                : selectedIds.length > 0
-                ? `Generate ${selectedIds.length} TAF PDFs (ZIP)`
-                : `Generate All ${travelers.length} TAF PDFs (ZIP)`}
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              Combined Mobilization
             </button>
+
+            {/* Batch ZIP Export with Tick Options */}
+            <div className="relative" ref={exportMenuRef}>
+              <div className="flex rounded-lg shadow-lg">
+                <button
+                  id="generate-all-zip-btn"
+                  onClick={() =>
+                    onBatchZipDownload(selectedIds.length > 0, {
+                      includeTaf: includeTafInZip,
+                      includeMobilization: includeMobInZip
+                    })
+                  }
+                  disabled={travelers.length === 0 || isProcessingBatch || (!includeTafInZip && !includeMobInZip)}
+                  className="flex items-center gap-2 text-xs font-semibold px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-l-lg transition-all disabled:opacity-40 cursor-pointer"
+                  title="Generate individual PDF for each traveler packaged in ZIP"
+                >
+                  <FileArchive className="w-4 h-4" />
+                  {isProcessingBatch
+                    ? 'Processing Batch...'
+                    : selectedIds.length > 0
+                    ? `Generate ${selectedIds.length} Forms (ZIP)`
+                    : `Generate All ${travelers.length} Forms (ZIP)`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                  disabled={travelers.length === 0 || isProcessingBatch}
+                  className="px-2 py-2 bg-indigo-700 hover:bg-indigo-600 text-white rounded-r-lg border-l border-indigo-500 transition-colors cursor-pointer"
+                  title="Choose which forms to include in the ZIP (TAF, Mobilization, or Both)"
+                >
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExportMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {/* Tick Options Dropdown */}
+              {isExportMenuOpen && (
+                <div className="absolute right-0 mt-1.5 w-72 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 p-3 space-y-3">
+                  <div className="border-b border-zinc-800 pb-2">
+                    <span className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
+                      <FileArchive className="w-3.5 h-3.5 text-indigo-400" />
+                      Batch Forms to Include in ZIP
+                    </span>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">
+                      Check which forms you want generated as separate PDFs inside the package:
+                    </p>
+                  </div>
+
+                  {/* TAF Form Checkbox */}
+                  <label className="flex items-start gap-2.5 text-xs text-zinc-200 cursor-pointer p-1.5 hover:bg-zinc-800/60 rounded-lg">
+                    <input
+                      type="checkbox"
+                      checked={includeTafInZip}
+                      onChange={e => setIncludeTafInZip(e.target.checked)}
+                      className="mt-0.5 rounded accent-indigo-500 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <div>
+                      <div className="font-semibold text-zinc-100">TAF Authorization Forms</div>
+                      <div className="text-[10px] text-zinc-400">CCS JV Standard Travel Authorization</div>
+                    </div>
+                  </label>
+
+                  {/* Mobilization Form Checkbox */}
+                  <label className="flex items-start gap-2.5 text-xs text-zinc-200 cursor-pointer p-1.5 hover:bg-zinc-800/60 rounded-lg">
+                    <input
+                      type="checkbox"
+                      checked={includeMobInZip}
+                      onChange={e => setIncludeMobInZip(e.target.checked)}
+                      className="mt-0.5 rounded accent-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <div>
+                      <div className="font-semibold text-emerald-300 flex items-center gap-1">
+                        <Building2 className="w-3 h-3 text-emerald-400" />
+                        Mobilization Forms (Print Separate)
+                      </div>
+                      <div className="text-[10px] text-zinc-400">Daewoo E&amp;C Mozambique Domestic Legal Sheet</div>
+                    </div>
+                  </label>
+
+                  {/* Action button inside popover */}
+                  <div className="pt-2 border-t border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsExportMenuOpen(false);
+                        onBatchZipDownload(selectedIds.length > 0, {
+                          includeTaf: includeTafInZip,
+                          includeMobilization: includeMobInZip
+                        });
+                      }}
+                      disabled={!includeTafInZip && !includeMobInZip}
+                      className="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-lg text-xs font-semibold shadow transition-colors cursor-pointer text-center"
+                    >
+                      Export Selected ({includeTafInZip && includeMobInZip ? 'Both Forms' : includeTafInZip ? 'TAF Only' : 'Mobilization Only'})
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Search & Filters */}
         <div className="mt-4 pt-4 border-t border-zinc-800 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          {/* Search box */}
-          <div className="flex items-center gap-2 flex-1 max-w-xl">
-            <div className="relative flex-1">
+          {/* Search box & Quick Status Chips */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+            <div className="relative flex-1 max-w-md">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input
                 id="traveler-search-input"
@@ -547,10 +667,65 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
                 </button>
               )}
             </div>
+
+            {/* Quick Status Chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <button
+                type="button"
+                onClick={() => setFilterStatus('ALL')}
+                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${
+                  filterStatus === 'ALL'
+                    ? 'bg-zinc-800 text-white border-zinc-600 shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200 border-transparent hover:bg-zinc-800/60'
+                }`}
+              >
+                All ({travelers.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterStatus('READY')}
+                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  filterStatus === 'READY'
+                    ? 'bg-emerald-950/80 text-emerald-300 border-emerald-600 shadow-xs'
+                    : 'text-emerald-400/80 hover:text-emerald-300 border-transparent hover:bg-emerald-950/40'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Ready ({readyCount})</span>
+              </button>
+              {criticalCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus('NEEDS_FIX')}
+                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    filterStatus === 'NEEDS_FIX'
+                      ? 'bg-rose-950/90 text-rose-200 border-rose-500 shadow-xs'
+                      : 'text-rose-400 hover:text-rose-200 border-rose-500/30 hover:bg-rose-950/50'
+                  }`}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Needs Fix ({criticalCount})</span>
+                </button>
+              )}
+              {warningCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus('WARNINGS')}
+                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    filterStatus === 'WARNINGS'
+                      ? 'bg-amber-950/90 text-amber-200 border-amber-500 shadow-xs'
+                      : 'text-amber-400 hover:text-amber-200 border-transparent hover:bg-amber-950/40'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Review ({warningCount})</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {/* Dropdown Filters */}
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
             {/* Status Filter */}
             <select
               id="status-filter"
@@ -562,18 +737,12 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
                   : 'bg-zinc-800 border-zinc-700 text-zinc-200'
               }`}
             >
-              <option value="ALL">All Records ({travelers.length})</option>
-              <option value="NEEDS_FIX">
-                ⚠️ Needs Fix ({criticalCount})
-              </option>
+              <option value="ALL">All Statuses ({travelers.length})</option>
+              <option value="READY">✅ Ready ({readyCount})</option>
+              <option value="NEEDS_FIX">⚠️ Needs Fix ({criticalCount})</option>
               {warningCount > 0 && (
-                <option value="WARNINGS">
-                  🕒 Review / Warnings ({warningCount})
-                </option>
+                <option value="WARNINGS">🕒 Review / Warnings ({warningCount})</option>
               )}
-              <option value="READY">
-                ✅ Ready ({readyCount})
-              </option>
             </select>
 
             {/* Company Filter */}
@@ -957,40 +1126,67 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
 
                     {/* Row Actions */}
                     <td className="py-2.5 px-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* TAF Form Tab Action */}
                         <button
                           id={`preview-btn-${t.id}`}
                           onClick={() => onPreviewTraveler(t)}
-                          className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-md transition-colors"
-                          title="Preview TAF Document"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-indigo-950/70 hover:bg-indigo-900 text-indigo-300 hover:text-white rounded-lg border border-indigo-700/60 shadow-xs transition-all cursor-pointer"
+                          title="View & Inspect TAF Document"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>TAF</span>
                         </button>
+
+                        {/* Daewoo Mobilization Form Tab Action */}
+                        <button
+                          id={`mob-btn-${t.id}`}
+                          onClick={() => {
+                            if (onViewMobilizationTab) {
+                              onViewMobilizationTab(t);
+                            } else if (onOpenMobilizationModal) {
+                              onOpenMobilizationModal(t);
+                            } else {
+                              onPreviewTraveler(t);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 hover:text-white rounded-lg border border-emerald-700/60 shadow-xs transition-all cursor-pointer"
+                          title="View & Print Daewoo E&C Mobilization Form (Separate Legal Sheet)"
+                        >
+                          <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Mob.</span>
+                        </button>
+
+                        {/* Edit Traveler */}
                         <button
                           id={`edit-btn-${t.id}`}
                           onClick={() => onEditTraveler(t)}
-                          className={`p-1.5 rounded-md transition-colors ${
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
                             issues.isCritical
-                              ? 'text-rose-400 hover:text-rose-200 hover:bg-rose-900/40'
-                              : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'
+                              ? 'text-rose-300 bg-rose-950/60 hover:bg-rose-900/80 border-rose-600/70'
+                              : 'text-zinc-400 hover:text-zinc-100 bg-zinc-800/80 hover:bg-zinc-700 border-zinc-700'
                           }`}
-                          title={issues.isCritical ? "Edit traveler info to fix issues" : "Edit Traveler Info"}
+                          title={issues.isCritical ? "Edit traveler info to fix critical issues" : "Edit Traveler Info"}
                         >
                           <Edit className="w-3.5 h-3.5" />
                         </button>
+
+                        {/* Download Single TAF PDF */}
                         <button
                           id={`download-pdf-${t.id}`}
                           onClick={() => downloadSinglePdf(t)}
-                          className="p-1.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-950/50 rounded-md transition-colors"
+                          className="p-1.5 text-indigo-400 hover:text-indigo-200 bg-zinc-800/80 hover:bg-indigo-950/80 rounded-lg border border-zinc-700 hover:border-indigo-700/60 transition-colors cursor-pointer"
                           title="Download single TAF PDF"
                         >
                           <FileDown className="w-3.5 h-3.5" />
                         </button>
+
+                        {/* Delete Traveler */}
                         <button
                           id={`delete-btn-${t.id}`}
                           onClick={() => onDeleteTraveler(t.id)}
-                          className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-950/40 rounded-md transition-colors"
-                          title="Delete"
+                          className="p-1.5 text-zinc-500 hover:text-red-400 bg-zinc-800/50 hover:bg-red-950/50 rounded-lg border border-zinc-800 hover:border-red-800/60 transition-colors cursor-pointer"
+                          title="Delete record"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

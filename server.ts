@@ -9,16 +9,15 @@ import { createDocuPassSession } from './src/server/idAnalyzer.ts';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-  // Seed default admin user on startup
-  try {
-    await getOrCreateUser('AdminE&C', 'ericstamarais@gmail.com', 'Eric Matola (Admin)', 'admin');
-  } catch (err) {
-    console.warn('Initial admin user seed notice:', err);
+  // Seed default admin user in background (non-blocking so server starts immediately)
+  if (process.env.SQL_HOST) {
+    getOrCreateUser('AdminE&C', 'ericstamarais@gmail.com', 'Eric Matola (Admin)', 'admin')
+      .catch(err => console.warn('Initial admin user seed notice:', err?.message || err));
   }
 
   // API Routes

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { UploadCloud, FileSpreadsheet, Download, Sparkles, AlertCircle, CheckCircle2, Camera, ChevronDown, Check, FileText } from 'lucide-react';
+import { UploadCloud, FileSpreadsheet, Download, Sparkles, AlertCircle, CheckCircle2, Camera, ChevronDown, ChevronUp, Check, FileText } from 'lucide-react';
 import {
   generateTravelersExcelBlob,
   downloadTravelersExcel,
@@ -31,6 +31,7 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastUploadedName, setLastUploadedName] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(savedTravelers.length > 0);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -143,78 +144,74 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
   };
 
   return (
-    <div className="bg-zinc-900 rounded-2xl border border-zinc-800 shadow-xl p-6 transition-all">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
-        <div>
-          <h2 className="text-base font-semibold text-zinc-100 flex items-center gap-2.5">
-            <FileSpreadsheet className="w-5 h-5 text-indigo-400" />
-            Upload Excel Travel Manifest
-          </h2>
-          <p className="text-xs text-zinc-400 mt-1">
-            Upload your flight schedule or traveler roster (supports batch generation for 10, 50, 100+ travelers in 1 click).
-          </p>
-        </div>
+    <div className="bg-zinc-900 rounded-2xl border border-zinc-800 shadow-xl transition-all overflow-hidden">
+      {/* Hidden file input always available */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        onChange={handleFileInputChange}
+        className="hidden"
+        id="excel-file-input"
+      />
 
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-          {onOpenScanner && (
-            <button
-              id="scan-passport-id-btn"
-              onClick={onOpenScanner}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-98 px-3.5 py-2 rounded-lg shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
-              title="Scan Passport or National ID card with Camera or Photo Upload"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Scan ID / Passport (AI OCR)</span>
-            </button>
-          )}
-
-          {/* Download Template Button with Saved TAFs intelligence */}
-          <div className="relative flex-1 sm:flex-none" ref={menuRef}>
-            <div className="inline-flex rounded-lg shadow-sm w-full">
-              <button
-                id="download-template-btn"
-                onClick={handleDownloadSavedTemplate}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-l-lg border transition-all cursor-pointer ${
-                  hasSavedTravelers
-                    ? 'bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-200 border-emerald-700/70'
-                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700'
-                }`}
-                title={
-                  hasSavedTravelers
-                    ? `Download Excel template populated with your ${savedTravelers.length} saved TAF records`
-                    : 'Download ready-to-fill Excel spreadsheet with 12 sample traveler records'
-                }
-              >
-                <FileSpreadsheet className={`w-3.5 h-3.5 ${hasSavedTravelers ? 'text-emerald-400' : 'text-zinc-400'}`} />
-                <span>
-                  {hasSavedTravelers
-                    ? `Download Template (${savedTravelers.length} Saved TAFs)`
-                    : 'Download Excel Template (.xlsx)'}
+      {/* If collapsed and has saved travelers, show sleek compact control bar */}
+      {hasSavedTravelers && isCollapsed ? (
+        <div className="p-4 flex flex-col sm:flex-row items-center justify-between gap-3 bg-zinc-900/90">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="w-9 h-9 rounded-xl bg-emerald-950/80 border border-emerald-700/60 flex items-center justify-center text-emerald-400 shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-zinc-100">
+                  {savedTravelers.length} Travelers Active in Manifest
                 </span>
-              </button>
+                {lastUploadedName && (
+                  <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded border border-zinc-700 font-mono truncate max-w-[200px]">
+                    {lastUploadedName}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-zinc-400">
+                All records verified &amp; ready for batch generation.
+              </p>
+            </div>
+          </div>
 
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg border border-zinc-700 transition-colors cursor-pointer"
+              title="Upload a new or updated Excel file"
+            >
+              <UploadCloud className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Replace / Upload Excel</span>
+            </button>
+
+            {/* Template Dropdown */}
+            <div className="relative inline-flex rounded-lg shadow-sm" ref={menuRef}>
               <button
-                id="download-template-menu-btn"
+                onClick={handleDownloadSavedTemplate}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 rounded-l-lg border border-emerald-700/60 transition-colors cursor-pointer"
+                title="Download Excel spreadsheet containing current saved data"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Excel Template ({savedTravelers.length})</span>
+              </button>
+              <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className={`px-2 py-2 rounded-r-lg border-y border-r transition-all cursor-pointer ${
-                  hasSavedTravelers
-                    ? 'bg-emerald-950/90 hover:bg-emerald-900 text-emerald-300 border-emerald-700/70'
-                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border-zinc-700'
-                }`}
-                title="Template download options (Saved TAFs, Blank Template, Sample)"
+                className="px-2 py-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 rounded-r-lg border-y border-r border-emerald-700/60 transition-colors cursor-pointer"
+                title="Template options"
               >
                 <ChevronDown className="w-3.5 h-3.5" />
               </button>
-            </div>
 
-            {/* Dropdown Menu */}
-            {isMenuOpen && (
-              <div className="absolute right-0 mt-1.5 w-72 bg-zinc-900 border border-zinc-700/90 rounded-xl shadow-2xl z-30 py-1.5 overflow-hidden backdrop-blur-md">
-                <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
-                  Template Download Options
-                </div>
-
-                {hasSavedTravelers && (
+              {isMenuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-72 bg-zinc-900 border border-zinc-700/90 rounded-xl shadow-2xl z-30 py-1.5 overflow-hidden backdrop-blur-md">
+                  <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                    Template Download Options
+                  </div>
                   <button
                     onClick={handleDownloadSavedTemplate}
                     className="w-full text-left px-3 py-2 text-xs text-emerald-300 hover:bg-emerald-950/60 flex items-center justify-between gap-2 transition-colors cursor-pointer"
@@ -230,107 +227,198 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
                       {savedTravelers.length} TAFs
                     </span>
                   </button>
+                  <button
+                    onClick={handleDownloadBlankTemplate}
+                    className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <div>
+                      <div className="font-medium text-zinc-200">Blank Official Template</div>
+                      <div className="text-[10px] text-zinc-400">Empty standard headers for distributing to staff</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={handleDownloadSampleTemplate}
+                    className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <div>
+                      <div className="font-medium text-zinc-200">Sample Template (12 Demo Records)</div>
+                      <div className="text-[10px] text-zinc-400">Pre-filled with DAEWOO Mozambique LNG examples</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Toggle Full Area */}
+            <button
+              onClick={() => setIsCollapsed(false)}
+              className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 px-2.5 py-1.5 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+              title="Expand full drag-and-drop zone"
+            >
+              <span>Expand</span>
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Full Expanded Dropzone View */
+        <div className="p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
+            <div>
+              <h2 className="text-base font-semibold text-zinc-100 flex items-center gap-2.5">
+                <FileSpreadsheet className="w-5 h-5 text-indigo-400" />
+                Upload Excel Travel Manifest
+              </h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                Upload flight schedule or traveler roster (supports batch generation for 10, 50, 100+ travelers in 1 click).
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              {onOpenScanner && (
+                <button
+                  id="scan-passport-id-btn"
+                  onClick={onOpenScanner}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-98 px-3.5 py-2 rounded-lg shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+                  title="Scan Passport or National ID card with Camera or Photo Upload"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Scan ID / Passport (AI OCR)</span>
+                </button>
+              )}
+
+              {/* Download Template Button */}
+              <div className="relative flex-1 sm:flex-none" ref={menuRef}>
+                <div className="inline-flex rounded-lg shadow-sm w-full">
+                  <button
+                    id="download-template-btn"
+                    onClick={handleDownloadSavedTemplate}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-l-lg border transition-all cursor-pointer ${
+                      hasSavedTravelers
+                        ? 'bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-200 border-emerald-700/70'
+                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700'
+                    }`}
+                  >
+                    <FileSpreadsheet className={`w-3.5 h-3.5 ${hasSavedTravelers ? 'text-emerald-400' : 'text-zinc-400'}`} />
+                    <span>
+                      {hasSavedTravelers
+                        ? `Download Template (${savedTravelers.length} TAFs)`
+                        : 'Download Excel Template (.xlsx)'}
+                    </span>
+                  </button>
+
+                  <button
+                    id="download-template-menu-btn"
+                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                    className={`px-2 py-2 rounded-r-lg border-y border-r transition-all cursor-pointer ${
+                      hasSavedTravelers
+                        ? 'bg-emerald-950/90 hover:bg-emerald-900 text-emerald-300 border-emerald-700/70'
+                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border-zinc-700'
+                    }`}
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Dropdown Menu */}
+                {isMenuOpen && (
+                  <div className="absolute right-0 mt-1.5 w-72 bg-zinc-900 border border-zinc-700/90 rounded-xl shadow-2xl z-30 py-1.5 overflow-hidden backdrop-blur-md">
+                    <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                      Template Download Options
+                    </div>
+                    {hasSavedTravelers && (
+                      <button
+                        onClick={handleDownloadSavedTemplate}
+                        className="w-full text-left px-3 py-2 text-xs text-emerald-300 hover:bg-emerald-950/60 flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <div>
+                            <div className="font-medium text-zinc-200">With Saved TAF Records</div>
+                            <div className="text-[10px] text-zinc-400">{savedTravelers.length} saved records included</div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] bg-emerald-900/80 text-emerald-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                          {savedTravelers.length} TAFs
+                        </span>
+                      </button>
+                    )}
+                    <button
+                      onClick={handleDownloadBlankTemplate}
+                      className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <div>
+                        <div className="font-medium text-zinc-200">Blank Official Template</div>
+                        <div className="text-[10px] text-zinc-400">Empty standard headers for distributing to staff</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={handleDownloadSampleTemplate}
+                      className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <div>
+                        <div className="font-medium text-zinc-200">Sample Template (12 Demo Records)</div>
+                        <div className="text-[10px] text-zinc-400">Pre-filled with DAEWOO Mozambique LNG examples</div>
+                      </div>
+                    </button>
+                  </div>
                 )}
+              </div>
 
+              {hasSavedTravelers && (
                 <button
-                  onClick={handleDownloadBlankTemplate}
-                  className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                  onClick={() => setIsCollapsed(true)}
+                  className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 px-2.5 py-2 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                  title="Collapse to compact bar"
                 >
-                  <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                  <div>
-                    <div className="font-medium text-zinc-200">Blank Official Template</div>
-                    <div className="text-[10px] text-zinc-400">Empty standard headers for distributing to staff</div>
-                  </div>
+                  <span>Collapse</span>
+                  <ChevronUp className="w-3.5 h-3.5" />
                 </button>
+              )}
+            </div>
+          </div>
 
-                <button
-                  onClick={handleDownloadSampleTemplate}
-                  className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <div>
-                    <div className="font-medium text-zinc-200">Sample Template (12 Demo Records)</div>
-                    <div className="text-[10px] text-zinc-400">Pre-filled with DAEWOO Mozambique LNG examples</div>
-                  </div>
-                </button>
+          {/* Drag & Drop Card */}
+          <div
+            id="dropzone-area"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-2xl p-7 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+              isDragging
+                ? 'border-indigo-500 bg-indigo-950/30 scale-[0.99]'
+                : 'border-zinc-800 hover:border-indigo-500/50 bg-zinc-950/40 hover:bg-zinc-950/70'
+            }`}
+          >
+            <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mb-2.5 text-zinc-400 border border-zinc-700/60 shadow-inner">
+              <UploadCloud className="w-5 h-5 text-zinc-400" />
+            </div>
+
+            <p className="text-sm font-medium text-zinc-200 mb-1">
+              Drop Excel source file here or click to browse
+            </p>
+            <p className="text-xs text-zinc-500 max-w-md">
+              Supports <span className="font-medium text-zinc-400">.XLSX</span>, <span className="font-medium text-zinc-400">.XLS</span>, or <span className="font-medium text-zinc-400">.CSV</span> with automatic header detection for Surname, ID, Flights, Camps, and Dates.
+            </p>
+
+            {lastUploadedName && (
+              <div className="mt-3.5 inline-flex items-center gap-2 bg-emerald-950/50 text-emerald-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-800/50">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                Loaded: {lastUploadedName}
               </div>
             )}
           </div>
-
-          <button
-            id="load-sample-btn"
-            onClick={handleLoadSampleData}
-            className="hidden"
-            title="Populate table with 12 real-world styled CCS JV traveler records"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            Load 12 Sample Records
-          </button>
-        </div>
-      </div>
-
-      {hasSavedTravelers && (
-        <div className="mb-4 px-3.5 py-2.5 bg-emerald-950/40 border border-emerald-800/60 rounded-xl flex items-center justify-between gap-3 text-xs text-emerald-300">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>
-              <strong>{savedTravelers.length} saved TAF records</strong> currently available. You can download the Excel template containing your saved data anytime.
-            </span>
-          </div>
-          <button
-            onClick={handleDownloadSavedTemplate}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 shadow-sm"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Download Excel ({savedTravelers.length} TAFs)
-          </button>
         </div>
       )}
 
-      {/* Drag & Drop Card */}
-      <div
-        id="dropzone-area"
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
-          isDragging
-            ? 'border-indigo-500 bg-indigo-950/30 scale-[0.99]'
-            : 'border-zinc-800 hover:border-indigo-500/50 bg-zinc-950/40 hover:bg-zinc-950/70'
-        }`}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          onChange={handleFileInputChange}
-          className="hidden"
-          id="excel-file-input"
-        />
-
-        <div className="w-14 h-14 rounded-full bg-zinc-800 flex items-center justify-center mb-3 text-zinc-400 border border-zinc-700/60 shadow-inner">
-          <UploadCloud className="w-6 h-6 text-zinc-400" />
-        </div>
-
-        <p className="text-sm font-medium text-zinc-200 mb-1">
-          Drop Excel source file here or click to browse
-        </p>
-        <p className="text-xs text-zinc-500 max-w-md">
-          Supports <span className="font-medium text-zinc-400">.XLSX</span>, <span className="font-medium text-zinc-400">.XLS</span>, or <span className="font-medium text-zinc-400">.CSV</span> with automatic header detection for Surname, ID, Flights, Camps, and Dates.
-        </p>
-
-        {lastUploadedName && (
-          <div className="mt-4 inline-flex items-center gap-2 bg-emerald-950/50 text-emerald-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-800/50">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            Loaded: {lastUploadedName}
-          </div>
-        )}
-      </div>
-
       {/* Error display */}
       {errorMsg && (
-        <div className="mt-3 p-3 bg-red-950/40 border border-red-800/50 rounded-xl flex items-center gap-2.5 text-xs text-red-300">
+        <div className="p-3 bg-red-950/40 border-t border-red-800/50 flex items-center gap-2.5 text-xs text-red-300">
           <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
           <span>{errorMsg}</span>
         </div>

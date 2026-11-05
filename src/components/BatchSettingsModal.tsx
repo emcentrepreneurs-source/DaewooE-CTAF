@@ -11,6 +11,8 @@ import { DrumWheelPickerModal } from './DrumWheelPickerModal';
 import { DrumPickerTriggerButton } from './DrumPickerTriggerButton';
 import { RotationPurposeSelector } from './RotationPurposeSelector';
 import { normalizeRotationOrPurpose } from '../utils/rotationPurposeOptions';
+import { MozambiqueProvincePicker } from './MozambiqueProvincePicker';
+import { MozambiqueAirportPicker } from './MozambiqueAirportPicker';
 
 interface BatchSettingsModalProps {
   isOpen: boolean;
@@ -284,26 +286,20 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-medium text-zinc-400 mb-1">
-                    FROM
-                  </label>
-                  <input
-                    type="text"
+                  <MozambiqueAirportPicker
+                    label="FROM (AIRPORT)"
                     value={flightFrom}
-                    onChange={e => setFlightFrom(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    onSelect={loc => setFlightFrom(loc.toUpperCase())}
+                    placeholder="e.g. PEMBA"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-medium text-zinc-400 mb-1">
-                    TO
-                  </label>
-                  <input
-                    type="text"
+                  <MozambiqueAirportPicker
+                    label="TO (AIRPORT)"
                     value={flightTo}
-                    onChange={e => setFlightTo(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    onSelect={loc => setFlightTo(loc.toUpperCase())}
+                    placeholder="e.g. AFUNGI"
                   />
                 </div>
 
@@ -533,18 +529,12 @@ export const BatchSettingsModal: React.FC<BatchSettingsModalProps> = ({
 
             {applyRotation && (
               <div className="space-y-3 pt-2">
-                <div>
-                  <label className="block text-[10px] font-medium text-zinc-400 mb-1">
-                    FINAL DESTINATION
-                  </label>
-                  <input
-                    type="text"
-                    value={finalDestination}
-                    onChange={e => setFinalDestination(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    placeholder="e.g. Afungi / Pemba / Maputo"
-                  />
-                </div>
+                <MozambiqueProvincePicker
+                  label="FINAL DESTINATION / OPERATIONAL SITE"
+                  value={finalDestination}
+                  onSelect={loc => setFinalDestination(loc.toUpperCase())}
+                  placeholder="Select Site (OPBL1, Afungi, Palma, Pemba, Maputo)..."
+                />
 
                 <div>
                   <div className="flex items-center justify-between mb-1">

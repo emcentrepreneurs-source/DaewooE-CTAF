@@ -6,14 +6,16 @@ import { DEFAULT_SIGNATURE_CONFIG } from './utils/signatureAutomationScripts';
 import { Header } from './components/Header';
 import { LoginScreen } from './components/LoginScreen';
 import { FileUploadArea } from './components/FileUploadArea';
-import { TravelersTable } from './components/TravelersTable';
+import { TravelersTable, getTravelerCriticalIssues } from './components/TravelersTable';
 import { TafFormPreview } from './components/TafFormPreview';
+import { MobilizationFormPreview } from './components/MobilizationFormPreview';
 import { EditTravelerModal } from './components/EditTravelerModal';
 import { BatchSettingsModal, BatchSettings } from './components/BatchSettingsModal';
 import { BatchProgressModal } from './components/BatchProgressModal';
 import { DatabaseModal } from './components/DatabaseModal';
 import { IdPassportScannerModal } from './components/IdPassportScannerModal';
 import { SignatureAutomationModal } from './components/SignatureAutomationModal';
+import { MobilizationFormModal } from './components/MobilizationFormModal';
 import { Toast, ToastMessage } from './components/Toast';
 import { recordActivityLog } from './utils/activityLogger';
 import { getMozambiqueIdValidityByAge, isMozambican } from './utils/dateTimeValidation';
@@ -29,7 +31,12 @@ import {
   Clock,
   Briefcase,
   Camera,
-  FileSignature
+  FileSignature,
+  Building2,
+  Users,
+  AlertTriangle,
+  UserPlus,
+  SlidersHorizontal
 } from 'lucide-react';
 
 export default function App() {
@@ -42,12 +49,13 @@ export default function App() {
   const [travelers, setTravelers] = useState<TravelerRecord[]>(SAMPLE_TRAVELERS);
   const [selectedIds, setSelectedIds] = useState<string[]>(SAMPLE_TRAVELERS.map(t => t.id));
   
-  // UI Tabs & Views
-  const [activeTab, setActiveTab] = useState<'manifest' | 'preview'>('manifest');
+  // UI Tabs & Views: Manifest Table, TAF Form Inspector, or Daewoo Mobilization Form Inspector
+  const [activeTab, setActiveTab] = useState<'manifest' | 'taf-preview' | 'mobilization-preview'>('manifest');
   const [previewIndex, setPreviewIndex] = useState<number>(0);
   
   // Modals
   const [editingTraveler, setEditingTraveler] = useState<TravelerRecord | null>(null);
+  const [selectedMobilizationTraveler, setSelectedMobilizationTraveler] = useState<TravelerRecord | null>(null);
   const [isBatchSettingsOpen, setIsBatchSettingsOpen] = useState(false);
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
@@ -242,12 +250,21 @@ export default function App() {
     }
   };
 
-  // Open single preview
+  // Open single TAF preview tab
   const handlePreviewTraveler = (traveler: TravelerRecord) => {
     const idx = travelers.findIndex(t => t.id === traveler.id);
     if (idx >= 0) {
       setPreviewIndex(idx);
-      setActiveTab('preview');
+      setActiveTab('taf-preview');
+    }
+  };
+
+  // Open single Daewoo Mobilization preview tab
+  const handleViewMobilization = (traveler: TravelerRecord) => {
+    const idx = travelers.findIndex(t => t.id === traveler.id);
+    if (idx >= 0) {
+      setPreviewIndex(idx);
+      setActiveTab('mobilization-preview');
     }
   };
 
@@ -456,7 +473,10 @@ export default function App() {
   };
 
   // Batch ZIP Export
-  const handleBatchZipDownload = async (selectedOnly: boolean = false) => {
+  const handleBatchZipDownload = async (
+    selectedOnly: boolean = false,
+    options: { includeTaf?: boolean; includeMobilization?: boolean } = { includeTaf: true, includeMobilization: false }
+  ) => {
     const listToExport = selectedOnly
       ? travelers.filter(t => selectedIds.includes(t.id))
       : travelers;
@@ -470,22 +490,29 @@ export default function App() {
     });
 
     try {
-      await exportTravelersToZip(listToExport, (current, total, travelerName) => {
-        setBatchProgress({
-          total,
-          current,
-          status: current === total ? 'zipping' : 'generating',
-          currentTravelerName: travelerName
-        });
-      });
+      await exportTravelersToZip(
+        listToExport,
+        (current, total, travelerName) => {
+          setBatchProgress({
+            total,
+            current,
+            status: current === total ? 'zipping' : 'generating',
+            currentTravelerName: travelerName
+          });
+        },
+        options
+      );
 
       setBatchProgress(prev => ({
         ...prev,
         status: 'completed'
       }));
+      const formTypes = [];
+      if (options.includeTaf) formTypes.push('TAF');
+      if (options.includeMobilization) formTypes.push('Mobilization');
       recordActivityLog(
         'Batch Generated',
-        `Generated and downloaded ZIP package containing ${listToExport.length} official TAF documents.`,
+        `Generated and downloaded ZIP package containing ${listToExport.length} official documents (${formTypes.join(' + ')}).`,
         currentUser || 'AdminE&C',
         { count: listToExport.length }
       );
@@ -540,6 +567,10 @@ export default function App() {
 
   const currentPreviewTraveler = travelers[previewIndex] || travelers[0];
   const readyCount = travelers.filter(t => t.isValid !== false).length;
+  const criticalCount = travelers.reduce((count, t) => {
+    const issues = getTravelerCriticalIssues(t);
+    return issues.isCritical ? count + 1 : count;
+  }, 0);
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col text-zinc-100 antialiased selection:bg-indigo-600 selection:text-white">
@@ -549,6 +580,8 @@ export default function App() {
         readyCount={readyCount}
         currentUser={currentUser}
         dbSyncStatus={dbSyncStatus}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
         onOpenDatabaseModal={() => setIsDatabaseModalOpen(true)}
         onOpenSignatureModal={() => setIsSignatureModalOpen(true)}
         onLogout={handleLogout}
@@ -556,42 +589,113 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Quick Instructions & Banner */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-zinc-100 shadow-xl relative overflow-hidden">
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                  Automated Workflow
-                </span>
-                <span className="text-xs text-zinc-400">
-                  Site Travel & Charter Flights
-                </span>
+        {/* Quick Command & Metrics Bar */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5 text-zinc-100 shadow-xl relative overflow-hidden">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+            {/* Metrics Chips */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+              {/* Total Manifest */}
+              <div
+                onClick={() => setActiveTab('manifest')}
+                className="bg-zinc-950/70 border border-zinc-800 hover:border-zinc-700 p-3 rounded-xl cursor-pointer transition-colors"
+                title="View full manifest table"
+              >
+                <div className="flex items-center gap-2 text-zinc-400 text-xs mb-1">
+                  <Users className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Total Manifest</span>
+                </div>
+                <div className="text-xl font-bold text-zinc-100">
+                  {travelers.length} <span className="text-xs font-normal text-zinc-500">travelers</span>
+                </div>
               </div>
-              <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-100">
-                Upload Excel ➔ Generate 10+ Standard TAF PDFs in 1-Click
-              </h1>
+
+              {/* Ready for Flight */}
+              <div
+                onClick={() => setActiveTab('manifest')}
+                className="bg-zinc-950/70 border border-zinc-800 hover:border-emerald-800/60 p-3 rounded-xl cursor-pointer transition-colors"
+                title="View verified travelers ready for travel"
+              >
+                <div className="flex items-center gap-2 text-emerald-400 text-xs mb-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Validated Ready</span>
+                </div>
+                <div className="text-xl font-bold text-emerald-400">
+                  {readyCount} <span className="text-xs font-normal text-zinc-500">passed</span>
+                </div>
+              </div>
+
+              {/* Critical Attention */}
+              <div
+                onClick={() => setActiveTab('manifest')}
+                className={`bg-zinc-950/70 border p-3 rounded-xl cursor-pointer transition-colors ${
+                  criticalCount > 0
+                    ? 'border-rose-700/60 hover:border-rose-600 bg-rose-950/20'
+                    : 'border-zinc-800 hover:border-zinc-700'
+                }`}
+                title={criticalCount > 0 ? "Click to view travelers needing passport/flight fixes" : "All records valid"}
+              >
+                <div className="flex items-center gap-2 text-xs mb-1">
+                  <AlertTriangle className={`w-3.5 h-3.5 ${criticalCount > 0 ? 'text-rose-400' : 'text-zinc-500'}`} />
+                  <span className={criticalCount > 0 ? 'text-rose-300 font-semibold' : 'text-zinc-400'}>
+                    Needs Fix
+                  </span>
+                </div>
+                <div className={`text-xl font-bold ${criticalCount > 0 ? 'text-rose-400' : 'text-zinc-400'}`}>
+                  {criticalCount} <span className="text-xs font-normal text-zinc-500">{criticalCount === 0 ? 'issues' : 'fix needed'}</span>
+                </div>
+              </div>
+
+              {/* Current Site */}
+              <div className="bg-zinc-950/70 border border-zinc-800 p-3 rounded-xl">
+                <div className="flex items-center gap-2 text-zinc-400 text-xs mb-1">
+                  <Building2 className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>Active Destination</span>
+                </div>
+                <div className="text-sm font-bold text-zinc-200 truncate">Afungi / OPBL1</div>
+                <div className="text-[10px] text-zinc-500 truncate">CCS JV Mozambique LNG</div>
+              </div>
             </div>
 
-            {/* Quick Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+            {/* Quick Actions */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 id="hero-scan-passport-btn"
                 onClick={() => setIsScannerModalOpen(true)}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-semibold text-xs px-4 py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                className="flex items-center justify-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs px-3.5 py-2.5 rounded-xl transition-all cursor-pointer"
                 title="Scan ID or Passport using Camera or Photo OCR"
               >
                 <Camera className="w-4 h-4 text-indigo-400" />
-                <span>Scan ID / Passport (AI OCR)</span>
+                <span>Scan ID / Passport</span>
+              </button>
+
+              <button
+                id="hero-add-traveler-btn"
+                onClick={handleAddNewTraveler}
+                className="flex items-center justify-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs px-3.5 py-2.5 rounded-xl transition-all cursor-pointer"
+                title="Add single traveler manually"
+              >
+                <UserPlus className="w-4 h-4 text-emerald-400" />
+                <span>Add Traveler</span>
+              </button>
+
+              <button
+                id="hero-batch-settings-btn"
+                onClick={() => setIsBatchSettingsOpen(true)}
+                className="flex items-center justify-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs px-3.5 py-2.5 rounded-xl transition-all cursor-pointer"
+                title="Apply shared flight date, camp, or airline to all travelers in 1 click"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-amber-400" />
+                <span>Batch Settings</span>
               </button>
 
               <button
                 id="hero-generate-all-btn"
-                onClick={() => handleBatchZipDownload(false)}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-6 py-3 rounded-xl shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                onClick={() => handleBatchZipDownload(false, { includeTaf: true, includeMobilization: true })}
+                className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                title="Generate all official PDFs (TAF + Daewoo Mobilization) in ZIP package"
               >
                 <FileArchive className="w-4 h-4" />
-                <span>Generate All {travelers.length} TAFs (ZIP)</span>
+                <span>Export ZIP ({travelers.length})</span>
               </button>
             </div>
           </div>
@@ -606,32 +710,50 @@ export default function App() {
         />
 
         {/* 2. Navigation Tabs */}
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-1">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
             <button
               id="tab-manifest-btn"
               onClick={() => setActiveTab('manifest')}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
                 activeTab === 'manifest'
-                  ? 'bg-zinc-900 text-indigo-400 shadow-sm border border-zinc-800'
+                  ? 'bg-zinc-900 text-indigo-400 shadow-md border border-zinc-800'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>Traveler Manifest Table ({travelers.length})</span>
+              <span>Manifest Table ({travelers.length})</span>
             </button>
 
             <button
-              id="tab-preview-btn"
-              onClick={() => setActiveTab('preview')}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium rounded-lg transition-all ${
-                activeTab === 'preview'
-                  ? 'bg-zinc-900 text-indigo-400 shadow-sm border border-zinc-800'
+              id="tab-taf-preview-btn"
+              onClick={() => setActiveTab('taf-preview')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                activeTab === 'taf-preview'
+                  ? 'bg-indigo-950/80 text-indigo-300 shadow-md border border-indigo-700/60'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
               }`}
             >
-              <Eye className="w-4 h-4" />
-              <span>Live PDF Form Inspector</span>
+              <Eye className="w-4 h-4 text-indigo-400" />
+              <span>TAF Form Inspector</span>
+              {currentPreviewTraveler && (
+                <span className="text-[10px] bg-zinc-800 text-zinc-300 font-mono px-1.5 py-0.5 rounded border border-zinc-700">
+                  {currentPreviewTraveler.surname}
+                </span>
+              )}
+            </button>
+
+            <button
+              id="tab-mobilization-preview-btn"
+              onClick={() => setActiveTab('mobilization-preview')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                activeTab === 'mobilization-preview'
+                  ? 'bg-emerald-950/80 text-emerald-300 shadow-md border border-emerald-700/60'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+              }`}
+            >
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <span>Daewoo Mobilization Forms</span>
               {currentPreviewTraveler && (
                 <span className="text-[10px] bg-zinc-800 text-zinc-300 font-mono px-1.5 py-0.5 rounded border border-zinc-700">
                   {currentPreviewTraveler.surname}
@@ -640,10 +762,9 @@ export default function App() {
             </button>
           </div>
 
-          {/* Quick jump to preview indicator */}
-          <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-500">
+          <div className="hidden md:flex items-center gap-2 text-xs text-zinc-500">
             <Clock className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Charter Notice Rule: 10 Business Days Minimum</span>
+            <span>Saipem / CCS JV Charter Standard</span>
           </div>
         </div>
 
@@ -655,6 +776,7 @@ export default function App() {
             onToggleSelect={handleToggleSelect}
             onSelectAll={handleSelectAll}
             onPreviewTraveler={handlePreviewTraveler}
+            onViewMobilizationTab={handleViewMobilization}
             onEditTraveler={t => setEditingTraveler(t)}
             onDeleteTraveler={handleDeleteTraveler}
             onAddTraveler={handleAddNewTraveler}
@@ -663,10 +785,11 @@ export default function App() {
             onBatchSettings={() => setIsBatchSettingsOpen(true)}
             onBatchZipDownload={handleBatchZipDownload}
             onCombinedPdfDownload={handleCombinedPdfDownload}
+            onOpenMobilizationModal={t => setSelectedMobilizationTraveler(t)}
             onToast={showToast}
             isProcessingBatch={batchProgress.status === 'generating' || batchProgress.status === 'zipping'}
           />
-        ) : (
+        ) : activeTab === 'taf-preview' ? (
           <div className="min-h-[850px]">
             {currentPreviewTraveler ? (
               <TafFormPreview
@@ -675,6 +798,25 @@ export default function App() {
                 currentIndex={previewIndex}
                 onNavigate={idx => setPreviewIndex(idx)}
                 onEdit={t => setEditingTraveler(t)}
+                onOpenMobilizationModal={t => setSelectedMobilizationTraveler(t)}
+              />
+            ) : (
+              <div className="p-12 text-center bg-zinc-900 rounded-2xl border border-zinc-800 text-zinc-500">
+                No traveler selected for preview. Please upload or load sample travelers.
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="min-h-[850px]">
+            {currentPreviewTraveler ? (
+              <MobilizationFormPreview
+                traveler={currentPreviewTraveler}
+                totalCount={travelers.length}
+                currentIndex={previewIndex}
+                onNavigate={idx => setPreviewIndex(idx)}
+                onEdit={t => setEditingTraveler(t)}
+                onOpenMobilizationModal={t => setSelectedMobilizationTraveler(t)}
+                onSwitchToTaf={() => setActiveTab('taf-preview')}
               />
             ) : (
               <div className="p-12 text-center bg-zinc-900 rounded-2xl border border-zinc-800 text-zinc-500">
@@ -718,6 +860,19 @@ export default function App() {
         onClose={() => setEditingTraveler(null)}
         onSave={handleSaveTraveler}
       />
+
+      {/* Daewoo E&C Mobilization Form Modal */}
+      {selectedMobilizationTraveler && (
+        <MobilizationFormModal
+          isOpen={!!selectedMobilizationTraveler}
+          traveler={selectedMobilizationTraveler}
+          onClose={() => setSelectedMobilizationTraveler(null)}
+          onSaveTraveler={updated => {
+            handleSaveTraveler(updated);
+            setSelectedMobilizationTraveler(updated);
+          }}
+        />
+      )}
 
       <BatchSettingsModal
         isOpen={isBatchSettingsOpen}
