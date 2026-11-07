@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { TravelerRecord, MobilizationFormData } from '../types';
 import { drawDaewooLogoInPdf } from '../assets/daewooLogo';
-import { extractMobilizationDataFromTraveler } from './mobilizationDataExtractor';
+import { extractMobilizationDataFromTraveler, formatNameFirstSurnameLast } from './mobilizationDataExtractor';
 import { DEFAULT_SIGNATURE_NAME, ERIC_MATOLA_SIGNATURE_BASE64 } from '../assets/signature';
 
 /**
@@ -114,10 +114,15 @@ function drawFittedText(
  * Exactly replicates the physical Mobilization_Form_2c6f7c7a.pdf template.
  */
 export function renderMobilizationPage(doc: jsPDF, travelerOrData: TravelerRecord | MobilizationFormData): void {
-  const data: MobilizationFormData =
+  const rawData: MobilizationFormData =
     'applicantName' in travelerOrData
       ? (travelerOrData as MobilizationFormData)
       : extractMobilizationDataFromTraveler(travelerOrData as TravelerRecord);
+
+  const data: MobilizationFormData = {
+    ...rawData,
+    applicantName: formatNameFirstSurnameLast(rawData.applicantName)
+  };
 
   // Layout Boundaries (A4: 210 x 297 mm)
   const startX = 20;

@@ -144,6 +144,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
   }, [activeTab]);
 
 
+
   // Start Camera
   const startCamera = useCallback(async () => {
     setCameraError(null);
@@ -433,7 +434,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
             {/* Provider Switcher */}
             <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-700/80 rounded-xl p-1 text-xs">
               <button
@@ -498,6 +499,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
             <UploadCloud className="w-4 h-4" />
             <span>Batch Upload Photos & PDFs</span>
           </button>
+
 
           <button
             onClick={() => setActiveTab('docupass')}
@@ -651,6 +653,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
                 )}
               </div>
             )}
+
 
             {activeTab === 'docupass' && (
               <div className="flex flex-col gap-3">

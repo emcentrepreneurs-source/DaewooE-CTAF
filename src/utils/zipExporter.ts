@@ -56,9 +56,10 @@ export async function exportTravelersToZip(
     // 2. Mobilization Form (Separate PDF with full Moz legal data)
     if (includeMobilization && mobFolder) {
       const mobData = extractMobilizationDataFromTraveler(traveler);
+      const mobNamePart = cleanFileName(`${traveler.companyId || (i + 1)}_${mobData.applicantName}`);
       const mobDoc = createMobilizationPdf(mobData);
       const mobBlob = mobDoc.output('blob');
-      mobFolder.file(`Mobilization_${namePart || `Traveler_${i + 1}`}.pdf`, mobBlob);
+      mobFolder.file(`Mobilization_${mobNamePart || `Traveler_${i + 1}`}.pdf`, mobBlob);
     }
   }
 

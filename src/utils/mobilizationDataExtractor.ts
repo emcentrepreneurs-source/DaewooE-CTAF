@@ -3,16 +3,102 @@ import { findProvinceForLocation } from './mozambiqueLocations';
 import { DEFAULT_SIGNATURE_NAME, ERIC_MATOLA_SIGNATURE_BASE64 } from '../assets/signature';
 
 /**
+ * Ensures any traveler name is formatted strictly as:
+ * NAME FIRST (Given/First Names) and SURNAME LAST (Family Name/Apelido)
+ *
+ * Handles:
+ * - Standard: nameAndGender="ABREU ANTONIO / MALE", surname="LUIS" -> "ABREU ANTONIO LUIS"
+ * - Comma format: "LUIS, ABREU ANTONIO / MALE" -> "ABREU ANTONIO LUIS"
+ * - Inverted order: "LUIS ABREU ANTONIO", surname="LUIS" -> "ABREU ANTONIO LUIS"
+ * - Single name + surname: "ERIC", surname="MATOLA" -> "ERIC MATOLA"
+ * - Already name first + surname last: "ERIC MATOLA", surname="MATOLA" -> "ERIC MATOLA" (no duplicate "MATOLA MATOLA")
+ * - Semicolon/dash separated: "MATOLA; ERIC" -> "ERIC MATOLA"
+ */
+export function formatNameFirstSurnameLast(nameAndGender?: string, surname?: string): string {
+  let rawName = nameAndGender ? nameAndGender.split('/')[0].trim() : '';
+  const sur = surname ? surname.replace(/[,;]/g, '').trim().toUpperCase() : '';
+
+  // 1. Handle comma format: "SURNAME, GIVEN NAMES" (common in HR manifests)
+  if (rawName.includes(',')) {
+    const commaParts = rawName.split(',').map(s => s.trim()).filter(Boolean);
+    if (commaParts.length >= 2) {
+      const part1 = commaParts[0].toUpperCase();
+      const part2 = commaParts.slice(1).join(' ').toUpperCase();
+      // If the part before comma is the surname or matches it, flip to Given Name + Surname
+      if (!sur || part1 === sur || sur.includes(part1) || part1.includes(sur)) {
+        return `${part2} ${sur || part1}`.replace(/\s+/g, ' ').trim();
+      }
+    }
+  }
+
+  // 2. Clean remaining punctuation and whitespace
+  rawName = rawName.replace(/[,;]/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+
+  // 3. Fallbacks when either part is missing
+  if (!rawName && !sur) return 'VANIA GUAMBE';
+  if (!sur) return rawName;
+  if (!rawName) return sur;
+
+  // 4. If rawName already equals surname
+  if (rawName === sur) {
+    return sur;
+  }
+
+  // 5. If rawName starts with the surname (e.g. "LUIS ABREU ANTONIO" with surname "LUIS", or "MATOLA ERIC" with surname "MATOLA")
+  if (rawName.startsWith(`${sur} `)) {
+    const givenPart = rawName.slice(sur.length).trim();
+    return `${givenPart} ${sur}`.replace(/\s+/g, ' ').trim();
+  }
+
+  // 6. If rawName already ends with the surname (e.g. "ABREU ANTONIO LUIS" with surname "LUIS")
+  if (rawName.endsWith(` ${sur}`)) {
+    return rawName;
+  }
+
+  // 7. If rawName contains the surname inside it (e.g. "ANTONIO LUIS ABREU")
+  const words = rawName.split(/\s+/);
+  if (words.includes(sur)) {
+    const withoutSur = words.filter(w => w !== sur).join(' ');
+    return `${withoutSur} ${sur}`.replace(/\s+/g, ' ').trim();
+  }
+
+  // 8. Default: Name First, Surname Last
+  return `${rawName} ${sur}`.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Backward compatibility alias for formatNameFirstSurnameLast.
+ */
+export const formatFirstAndSurname = formatNameFirstSurnameLast;
+
+/**
  * Automatically collects and extracts complete Mobilization Form data from any Traveler / TAF record.
  * Guarantees zero data loss, injects the same signatures and dates as TAF, and prepares the form to be printed separately.
  */
 export function extractMobilizationDataFromTraveler(traveler: TravelerRecord): MobilizationFormData {
   const existing = traveler.mobilizationForm;
 
-  // 1. Applicant Name: e.g. "VANIA GUAMBE"
-  const rawGivenName = traveler.nameAndGender ? traveler.nameAndGender.split('/')[0].trim() : '';
-  const surname = traveler.surname ? traveler.surname.trim() : '';
-  const fullName = [surname, rawGivenName].filter(Boolean).join(' ').toUpperCase() || 'VANIA GUAMBE';
+  // 1. Applicant Name: Strictly Name First and Surname Last (e.g. "ABREU ANTONIO LUIS", "ERIC MATOLA", or "VANIA GUAMBE")
+  const rawGivenName = traveler.nameAndGender ? traveler.nameAndGender.split('/')[0].replace(/,/g, '').trim() : '';
+  const surname = traveler.surname ? traveler.surname.replace(/,/g, '').trim() : '';
+  const fullName = formatNameFirstSurnameLast(traveler.nameAndGender, traveler.surname);
+
+  // If existing applicantName exists, ensure it is also strictly formatted with Name First and Surname Last
+  let applicantName = fullName;
+  if (existing?.applicantName) {
+    const existingClean = existing.applicantName.trim().toUpperCase();
+    const oldSurnameFirst = [surname, rawGivenName].filter(Boolean).join(' ').trim().toUpperCase();
+
+    if (
+      existingClean === oldSurnameFirst ||
+      (surname && (existingClean.startsWith(surname.toUpperCase() + ' ') || existingClean.startsWith(surname.toUpperCase() + ',')))
+    ) {
+      applicantName = fullName;
+    } else {
+      // Re-apply Name First, Surname Last guarantee even if user had typed or imported a surname-first string
+      applicantName = formatNameFirstSurnameLast(existingClean, surname);
+    }
+  }
 
   // 2. Position & Department
   const position = (traveler.projectPosition || 'ADMIN. SECRETARY').toUpperCase();
@@ -99,7 +185,7 @@ export function extractMobilizationDataFromTraveler(traveler: TravelerRecord): M
 
   return {
     formDate,
-    applicantName: existing?.applicantName || fullName,
+    applicantName,
     position: existing?.position || position,
     department: existing?.department || department,
     site,

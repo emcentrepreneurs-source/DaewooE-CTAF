@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TravelerRecord, MobilizationFormData, MobilizationRouteEntry } from '../types';
-import { extractMobilizationDataFromTraveler } from '../utils/mobilizationDataExtractor';
+import { extractMobilizationDataFromTraveler, formatNameFirstSurnameLast } from '../utils/mobilizationDataExtractor';
 import { downloadSingleMobilizationPdf } from '../utils/mobilizationPdfGenerator';
 import { MozambiqueProvincePicker } from './MozambiqueProvincePicker';
 import { MozambiqueAirportPicker } from './MozambiqueAirportPicker';
@@ -173,10 +173,13 @@ export const MobilizationFormModal: React.FC<MobilizationFormModalProps> = ({
   };
 
   const handleSave = () => {
+    const formattedApplicantName = formatNameFirstSurnameLast(formData.applicantName, traveler.surname);
     const updatedForm: MobilizationFormData = {
       ...formData,
+      applicantName: formattedApplicantName,
       isCustomRoute
     };
+    setFormData(updatedForm);
     const updated: TravelerRecord = {
       ...traveler,
       mobilizationForm: updatedForm
@@ -188,10 +191,12 @@ export const MobilizationFormModal: React.FC<MobilizationFormModalProps> = ({
   };
 
   const handlePrint = () => {
+    const formattedApplicantName = formatNameFirstSurnameLast(formData.applicantName, traveler.surname);
     downloadSingleMobilizationPdf({
       ...traveler,
       mobilizationForm: {
         ...formData,
+        applicantName: formattedApplicantName,
         isCustomRoute
       }
     });
@@ -510,13 +515,15 @@ export const MobilizationFormModal: React.FC<MobilizationFormModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-                      Applicant Name
+                    <label className="block text-[11px] font-medium text-zinc-400 mb-1 flex items-center justify-between">
+                      <span>Applicant Name</span>
+                      <span className="text-[10px] text-emerald-400 font-mono font-medium">Name First, Surname Last</span>
                     </label>
                     <input
                       type="text"
                       value={formData.applicantName}
                       onChange={e => handleFieldChange('applicantName', e.target.value.toUpperCase())}
+                      placeholder="e.g. ABREU ANTONIO LUIS"
                       className="w-full px-2.5 py-1.5 text-xs bg-zinc-800/90 border border-zinc-700 text-zinc-100 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono"
                     />
                   </div>
