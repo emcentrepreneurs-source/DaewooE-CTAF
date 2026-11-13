@@ -133,7 +133,7 @@ export function extractMobilizationDataFromTraveler(traveler: TravelerRecord): M
   const signatureName = traveler.signatureName || existing?.signatureName || DEFAULT_SIGNATURE_NAME;
   const signatureImage = traveler.signatureImage || existing?.signatureImage || ERIC_MATOLA_SIGNATURE_BASE64;
   const signatureDate = traveler.signatureDate || existing?.signatureDate || traveler.flights?.[0]?.date || '06 AUGUST 2026';
-  const arrivalDate = existing?.arrivalDate || traveler.flights?.[0]?.date || signatureDate || '12-Mar-2026';
+  const arrivalDate = existing?.arrivalDate || traveler.accommodation?.[0]?.checkIn || traveler.flights?.[0]?.date || signatureDate || '12-Mar-2026';
   const formDate = existing?.formDate || traveler.signatureDate || signatureDate;
 
   // 6. Routes: If existing has custom route, preserve existing.routes!

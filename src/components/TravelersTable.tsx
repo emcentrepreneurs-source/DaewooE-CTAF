@@ -1087,12 +1087,26 @@ export const TravelersTable: React.FC<TravelersTableProps> = ({
                     </td>
 
                     {/* Accommodation */}
+                    {/* Accommodation & Stay Dates */}
                     <td className="py-2.5 px-3">
-                      <div className="font-medium text-zinc-200">
-                        {acc?.hotelOrCamp || '9500'}
+                      <div className="font-medium text-zinc-200 flex items-center gap-1.5">
+                        <span>{acc?.hotelOrCamp || '9500'}</span>
+                        {acc?.location && (
+                          <span className="text-[10px] text-zinc-500 font-normal">({acc.location})</span>
+                        )}
                       </div>
-                      <div className="text-[10px] text-zinc-500">
-                        {acc?.notes || 'SHARED'}
+                      <div className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1">
+                        <span className="font-mono text-[10px] text-zinc-300">
+                          {acc?.checkIn || flight?.date || '8/9/2026'}
+                        </span>
+                        {acc?.checkOut ? (
+                          <>
+                            <span className="text-zinc-500">→</span>
+                            <span className="font-mono text-[10px] text-indigo-300 font-medium">{acc.checkOut}</span>
+                          </>
+                        ) : (
+                          <span className="text-zinc-600 text-[9px] italic">(open)</span>
+                        )}
                       </div>
                     </td>
 

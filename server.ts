@@ -159,16 +159,18 @@ async function startServer() {
     }
   });
 
-  // AI & Optical Scan for Passport / National ID Card (Gemini Vision + ID Analyzer Global 190+ Engine)
+  // AI & Optical Scan for Passport / National ID Card (OCR.Space Engine + Gemini Vision + ID Analyzer)
   app.post('/api/scan-id', async (req, res) => {
     try {
-      const { image, mimeType, provider, idAnalyzerKey } = req.body;
-      if (!image) {
-        return res.status(400).json({ error: 'Image base64 payload is required' });
+      const { image, mimeType, provider, idAnalyzerKey, ocrSpaceKey, imageUrl } = req.body;
+      if (!image && !imageUrl) {
+        return res.status(400).json({ error: 'Image base64 payload or imageUrl is required' });
       }
-      const extracted = await scanIdOrPassport(image, mimeType || 'image/jpeg', {
+      const extracted = await scanIdOrPassport(image || '', mimeType || 'image/jpeg', {
         provider,
-        idAnalyzerKey
+        idAnalyzerKey,
+        ocrSpaceKey,
+        imageUrl
       });
       res.json({ success: true, data: extracted });
     } catch (error: any) {
@@ -180,7 +182,7 @@ async function startServer() {
   // Batch Scan multiple IDs / Passports
   app.post('/api/scan-id/batch', async (req, res) => {
     try {
-      const { images, provider, idAnalyzerKey } = req.body;
+      const { images, provider, idAnalyzerKey, ocrSpaceKey } = req.body;
       if (!Array.isArray(images) || images.length === 0) {
         return res.status(400).json({ error: 'Images array is required' });
       }
@@ -192,7 +194,8 @@ async function startServer() {
         try {
           const extracted = await scanIdOrPassport(imgData, mime, {
             provider,
-            idAnalyzerKey
+            idAnalyzerKey,
+            ocrSpaceKey
           });
           results.push({ ...extracted, sourceFile: fileName });
         } catch (err: any) {

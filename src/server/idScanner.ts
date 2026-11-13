@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { scanWithIdAnalyzer } from './idAnalyzer.ts';
+import { scanWithOcrSpace, parseOcrSpaceTextToIdData } from './ocrSpace.ts';
 
 export interface ExtractedIdData {
   surname: string;
@@ -251,15 +252,35 @@ export async function scanIdOrPassport(
   base64Image: string,
   mimeType: string = 'image/jpeg',
   options?: {
-    provider?: 'idanalyzer' | 'gemini' | 'auto';
+    provider?: 'ocrspace' | 'idanalyzer' | 'gemini' | 'auto';
     idAnalyzerKey?: string;
+    ocrSpaceKey?: string;
+    imageUrl?: string;
   }
 ): Promise<ExtractedIdData> {
-  const cleanBase64 = base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '').trim();
+  const cleanBase64 = base64Image ? base64Image.replace(/^data:image\/[a-zA-Z+]+;base64,/, '').trim() : '';
   let idAnalyzerNotice: string | null = null;
-  
-  // 1. If ID Analyzer is explicitly selected or ID_ANALYZER_API_KEY is available and provider is auto/idanalyzer
-  const preferIdAnalyzer = options?.provider === 'idanalyzer' || (options?.provider !== 'gemini' && !!process.env.ID_ANALYZER_API_KEY);
+
+  // 1. If OCR.Space is explicitly selected or an imageUrl is provided (as in ocr_space_url_image.js macro)
+  if (options?.provider === 'ocrspace' || options?.imageUrl) {
+    try {
+      const ocrResult = await scanWithOcrSpace({
+        base64Image: cleanBase64,
+        imageUrl: options?.imageUrl,
+        mimeType,
+        apiKey: options?.ocrSpaceKey
+      });
+      if (ocrResult.data) {
+        return ocrResult.data;
+      }
+      console.warn('OCR.space returned notice, trying next engine:', ocrResult.error);
+    } catch (err: any) {
+      console.warn('OCR.space error, falling back:', err?.message);
+    }
+  }
+
+  // 2. If ID Analyzer is explicitly selected or ID_ANALYZER_API_KEY is available and provider is auto/idanalyzer
+  const preferIdAnalyzer = options?.provider === 'idanalyzer' || (options?.provider !== 'gemini' && options?.provider !== 'ocrspace' && !!process.env.ID_ANALYZER_API_KEY);
   if (preferIdAnalyzer) {
     try {
       const analyzerResult = await scanWithIdAnalyzer(cleanBase64, options?.idAnalyzerKey);

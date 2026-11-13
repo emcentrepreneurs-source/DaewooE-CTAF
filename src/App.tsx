@@ -19,6 +19,7 @@ import { MobilizationFormModal } from './components/MobilizationFormModal';
 import { Toast, ToastMessage } from './components/Toast';
 import { recordActivityLog } from './utils/activityLogger';
 import { getMozambiqueIdValidityByAge, isMozambican } from './utils/dateTimeValidation';
+import { extractMobilizationDataFromTraveler } from './utils/mobilizationDataExtractor';
 import {
   FileSpreadsheet,
   FileCheck,
@@ -425,17 +426,68 @@ export default function App() {
         updated.flights = flights;
       }
 
-      // Accommodation updates
-      if (settings.hotelOrCamp || settings.campLocation || settings.accommodationNotes) {
+      // Accommodation updates (Check-In / Check-Out dates & Camp)
+      const hasAccUpdates = Boolean(
+        settings.hotelOrCamp ||
+        settings.campLocation ||
+        settings.accommodationNotes ||
+        settings.applyAccommodationDates ||
+        settings.checkInDate !== undefined ||
+        settings.checkOutDate !== undefined
+      );
+
+      if (hasAccUpdates) {
         const acc = [...(updated.accommodation || [])];
+        const resolvedCheckIn = settings.checkInDate || settings.flightDate || acc[0]?.checkIn || '8/9/2026';
+        const resolvedCheckOut = settings.checkOutDate !== undefined ? settings.checkOutDate : (acc[0]?.checkOut || '');
         acc[0] = {
-          checkIn: settings.flightDate || acc[0]?.checkIn || '8/9/2026',
-          checkOut: acc[0]?.checkOut || '',
+          checkIn: resolvedCheckIn,
+          checkOut: resolvedCheckOut,
           hotelOrCamp: settings.hotelOrCamp || acc[0]?.hotelOrCamp || '9500',
           location: settings.campLocation || acc[0]?.location || 'AFUNGI',
           notes: settings.accommodationNotes || acc[0]?.notes || 'SHARED'
         };
         updated.accommodation = acc;
+      }
+
+      // Synchronize Mobilization Form (Arrival Date & Route) if requested or checkInDate updated
+      if (settings.applyToMobilization || settings.checkInDate) {
+        const mobCheckIn = settings.checkInDate || updated.accommodation?.[0]?.checkIn || settings.flightDate;
+        if (mobCheckIn) {
+          if (updated.mobilizationForm) {
+            const mob = { ...updated.mobilizationForm };
+            mob.arrivalDate = mobCheckIn;
+            if (mob.routes && mob.routes.length > 0) {
+              const updatedRoutes = [...mob.routes];
+              updatedRoutes[0] = {
+                ...updatedRoutes[0],
+                date: mobCheckIn
+              };
+              mob.routes = updatedRoutes;
+            }
+            if (settings.campLocation || settings.hotelOrCamp) {
+              const campLoc = settings.campLocation || settings.hotelOrCamp;
+              if (campLoc && (!mob.site || mob.site === 'OPBL1')) {
+                mob.site = campLoc.toUpperCase();
+              }
+            }
+            if (settings.signatureDate) mob.signatureDate = settings.signatureDate;
+            if (settings.signatureName) mob.signatureName = settings.signatureName;
+            updated.mobilizationForm = mob;
+          } else {
+            const mob = extractMobilizationDataFromTraveler(updated);
+            mob.arrivalDate = mobCheckIn;
+            if (mob.routes && mob.routes.length > 0) {
+              mob.routes[0] = {
+                ...mob.routes[0],
+                date: mobCheckIn
+              };
+            }
+            if (settings.signatureDate) mob.signatureDate = settings.signatureDate;
+            if (settings.signatureName) mob.signatureName = settings.signatureName;
+            updated.mobilizationForm = mob;
+          }
+        }
       }
 
       // Mozambique ID validity calculation by age (Under 40: 5y, 40-49: 10y, 50+: Vitalício)

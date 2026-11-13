@@ -34,11 +34,16 @@ import {
   QrCode,
   Smartphone,
   ExternalLink,
-  Clock
+  Clock,
+  Cpu,
+  Link2
 } from 'lucide-react';
 import { TravelerRecord } from '../types';
 import {
   scanIdImage,
+  scanIdImageUrl,
+  parseOcrSpaceText,
+  OCR_SPACE_URL,
   SAMPLE_ID_PRESETS,
   convertExtractedIdToTravelerRecord,
   generateDocuPassLink,
@@ -81,8 +86,14 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
   onClose,
   onAddTravelers
 }) => {
-  const [activeTab, setActiveTab] = useState<'camera' | 'upload' | 'docupass'>('camera');
-  const [scanProvider, setScanProvider] = useState<'idanalyzer' | 'gemini'>('gemini');
+  const [activeTab, setActiveTab] = useState<'camera' | 'upload' | 'ocrspace' | 'docupass'>('camera');
+  const [scanProvider, setScanProvider] = useState<'ocrspace' | 'idanalyzer' | 'gemini'>('ocrspace');
+
+  // OCR.Space Engine & URL State (replicates ocr_space_url_image.js macro)
+  const [ocrImageUrl, setOcrImageUrl] = useState('https://ui.vision/content/images/ui.vision.logo2.webp');
+  const [ocrSpaceInput, setOcrSpaceInput] = useState('');
+  const [ocrSpaceNotice, setOcrSpaceNotice] = useState<string | null>(null);
+  const [isUrlScanning, setIsUrlScanning] = useState(false);
 
   // DocuPass state
   const [docuPassData, setDocuPassData] = useState<{
@@ -144,6 +155,63 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
   }, [activeTab]);
 
 
+
+  // OCR.Space Handlers (matching ocr_space_url_image.js macro logic)
+  const handleScanImageUrl = async () => {
+    if (!ocrImageUrl.trim()) {
+      setOcrSpaceNotice('Please provide a valid image URL (e.g. JPG, PNG, WEBP, or PDF).');
+      return;
+    }
+    setIsUrlScanning(true);
+    setOcrSpaceNotice('Sending image URL to OCR.Space Engine 2 for recognition...');
+    try {
+      const extracted = await scanIdImageUrl(ocrImageUrl.trim(), { provider: 'ocrspace' });
+      setExtractedList(prev => [extracted, ...prev]);
+      setSelectedResultIndex(0);
+      setOcrSpaceNotice(`Recognised: ${extracted.givenNames} ${extracted.surname} (${extracted.passportOrIdNumber})`);
+      setTimeout(() => setOcrSpaceNotice(null), 5000);
+    } catch (err: any) {
+      setOcrSpaceNotice(`OCR.Space URL error: ${err.message || 'Could not recognize image URL'}`);
+    } finally {
+      setIsUrlScanning(false);
+    }
+  };
+
+  const handleParseOcrSpaceText = () => {
+    if (!ocrSpaceInput.trim()) {
+      setOcrSpaceNotice('Please paste recognized OCR text from OCR.space first.');
+      return;
+    }
+    try {
+      const extracted = parseOcrSpaceText(ocrSpaceInput);
+      setExtractedList(prev => [extracted, ...prev]);
+      setSelectedResultIndex(0);
+      setOcrSpaceNotice(`Successfully parsed: ${extracted.givenNames} ${extracted.surname} (${extracted.passportOrIdNumber})`);
+      setTimeout(() => setOcrSpaceNotice(null), 5000);
+    } catch (err: any) {
+      setOcrSpaceNotice(`Parse error: ${err.message || 'Could not parse text'}`);
+    }
+  };
+
+  const handleLoadOcrSpaceSample = () => {
+    const sample = `REPÚBLICA DE MOÇAMBIQUE
+BILHETE DE IDENTIDADE
+Apelido: LUIS
+Nome: ABREU ANTONIO
+Nacionalidade: MOÇAMBICANA
+Sexo: M
+Data de Nasc.: 12-Ago-1990
+Nº de Identificação: 050101589757Q
+Data de Emissão: 16-Jan-2023
+Data de Validade: 16-Jan-2033
+Local de Emissão: MAPUTO`;
+    setOcrSpaceInput(sample);
+    const parsed = parseOcrSpaceText(sample);
+    setExtractedList(prev => [parsed, ...prev]);
+    setSelectedResultIndex(0);
+    setOcrSpaceNotice('Loaded sample Mozambique National ID (BI) output for Abreu Antonio Luis!');
+    setTimeout(() => setOcrSpaceNotice(null), 4000);
+  };
 
   // Start Camera
   const startCamera = useCallback(async () => {
@@ -225,7 +293,9 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
   const processImageForOCR = async (base64Data: string, mimeType: string, sourceName?: string) => {
     setIsScanning(true);
     setScanStepMessage(
-      scanProvider === 'idanalyzer'
+      scanProvider === 'ocrspace'
+        ? 'Scanning with OCR.Space Engine 2 (< 2s)...'
+        : scanProvider === 'idanalyzer'
         ? 'Scanning with ID Analyzer Engine (< 3s)...'
         : 'Executing Gemini Multimodal Vision OCR & Document Verification...'
     );
@@ -284,7 +354,7 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
 
     for (let i = 0; i < fileArray.length; i++) {
       const file = fileArray[i];
-      setScanStepMessage(`Analyzing document ${i + 1} of ${fileArray.length}: ${file.name} (${scanProvider === 'idanalyzer' ? 'ID Analyzer Global' : 'Gemini Vision'})...`);
+      setScanStepMessage(`Analyzing document ${i + 1} of ${fileArray.length}: ${file.name} (${scanProvider === 'ocrspace' ? 'OCR.Space Engine 2' : scanProvider === 'idanalyzer' ? 'ID Analyzer Global' : 'Gemini Vision'})...`);
 
       const base64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -439,16 +509,16 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
             <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-700/80 rounded-xl p-1 text-xs">
               <button
                 type="button"
-                onClick={() => setScanProvider('idanalyzer')}
+                onClick={() => setScanProvider('ocrspace')}
                 className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  scanProvider === 'idanalyzer'
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                  scanProvider === 'ocrspace'
+                    ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
-                title="ID Analyzer Verification Engine"
+                title="OCR.Space Recognition Engine (Free, Engine 2 High-Precision for Passports & Mozambique IDs)"
               >
-                <Zap className="w-3 h-3 text-amber-300" />
-                <span>ID Analyzer</span>
+                <Cpu className="w-3 h-3 text-emerald-300" />
+                <span>OCR.Space</span>
               </button>
               <button
                 type="button"
@@ -462,6 +532,19 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
               >
                 <Sparkles className="w-3 h-3 text-indigo-300" />
                 <span>Gemini Vision</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setScanProvider('idanalyzer')}
+                className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  scanProvider === 'idanalyzer'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="ID Analyzer Verification Engine"
+              >
+                <Zap className="w-3 h-3 text-amber-300" />
+                <span>ID Analyzer</span>
               </button>
             </div>
 
@@ -498,6 +581,21 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
           >
             <UploadCloud className="w-4 h-4" />
             <span>Batch Upload Photos & PDFs</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ocrspace')}
+            className={`pb-2.5 font-semibold px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'ocrspace'
+                ? 'border-emerald-500 text-emerald-300 bg-emerald-500/10 rounded-t-lg'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Cpu className="w-4 h-4 text-emerald-400" />
+            <span>OCR.Space URL &amp; Text</span>
+            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold uppercase border border-emerald-500/40">
+              Engine 2
+            </span>
           </button>
 
 
@@ -654,6 +752,145 @@ export const IdPassportScannerModal: React.FC<IdPassportScannerModalProps> = ({
               </div>
             )}
 
+            {/* OCR.SPACE ENGINE & URL SCANNER PANEL (replicates ocr_space_url_image.js) */}
+            {activeTab === 'ocrspace' && (
+              <div className="flex flex-col gap-3">
+                <div className="bg-zinc-950/90 border border-emerald-500/40 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          <Cpu className="w-3 h-3 text-emerald-400" />
+                          OCR.Space Engine 2
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+                          URL &amp; Raw OCR Parser
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm text-zinc-100">
+                        OCR.Space Online Image &amp; Text Recognition
+                      </h4>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Run OCR on an online image URL or paste raw recognized text from ocr.space to extract ID cards and passports.
+                      </p>
+                    </div>
+
+                    <a
+                      href={OCR_SPACE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                      title="Open https://ocr.space in a new tab"
+                    >
+                      <span>ocr.space</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+
+                  {/* SECTION 1: RUN OCR ON AN IMAGE URL (Matches ocr_space_url_image.js macro) */}
+                  <div className="p-3.5 bg-zinc-900/80 rounded-xl border border-zinc-800 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+                        <Link2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>1. Run OCR on Image URL (Web Macro mode):</span>
+                      </label>
+                      <span className="text-[10px] text-zinc-400 font-mono">
+                        WEBP, PNG, JPG, PDF
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="url"
+                        value={ocrImageUrl}
+                        onChange={e => setOcrImageUrl(e.target.value)}
+                        placeholder="https://example.com/document.jpg or webp..."
+                        className="flex-1 px-3 py-2 text-xs bg-zinc-950 border border-zinc-700 rounded-xl text-zinc-100 font-mono placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleScanImageUrl}
+                        disabled={isUrlScanning || !ocrImageUrl.trim()}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                      >
+                        {isUrlScanning ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-3.5 h-3.5 fill-current" />
+                            <span>Run OCR URL</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[11px] text-zinc-400 flex-wrap">
+                      <span>Quick Presets:</span>
+                      <button
+                        type="button"
+                        onClick={() => setOcrImageUrl('https://ui.vision/content/images/ui.vision.logo2.webp')}
+                        className="text-[10px] font-mono text-emerald-400 hover:underline cursor-pointer"
+                      >
+                        ui.vision.logo2.webp
+                      </button>
+                      <span>•</span>
+                      <button
+                        type="button"
+                        onClick={() => setOcrImageUrl('https://raw.githubusercontent.com/tesseract-ocr/test/master/testing/phototest.tif')}
+                        className="text-[10px] font-mono text-indigo-400 hover:underline cursor-pointer"
+                      >
+                        phototest.tif
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* SECTION 2: PASTE RAW RECOGNIZED OCR TEXT (Matches txtAreaParsedResult in macro) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <label className="font-semibold text-zinc-200 flex items-center gap-1.5">
+                        <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>2. Paste Recognized OCR Text (txtAreaParsedResult):</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleLoadOcrSpaceSample}
+                        className="text-[10px] font-semibold text-emerald-300 hover:text-emerald-200 bg-zinc-900 border border-zinc-700 hover:border-emerald-500 px-2.5 py-0.5 rounded cursor-pointer transition-colors"
+                      >
+                        Load Mozambique BI Sample
+                      </button>
+                    </div>
+
+                    <textarea
+                      value={ocrSpaceInput}
+                      onChange={e => setOcrSpaceInput(e.target.value)}
+                      placeholder="Paste recognized text from ocr.space here (e.g. Bilhete de Identidade, Passport number, Name, Dates)..."
+                      rows={4}
+                      className="w-full p-2.5 text-xs bg-zinc-900 border border-zinc-700 rounded-xl text-zinc-100 placeholder:text-zinc-500 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+
+                    {ocrSpaceNotice && (
+                      <div className="p-2.5 bg-zinc-900 border border-emerald-700/60 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                        <Info className="w-3.5 h-3.5 shrink-0" />
+                        <span>{ocrSpaceNotice}</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleParseOcrSpaceText}
+                      className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Cpu className="w-4 h-4" />
+                      <span>Parse OCR Text &amp; Auto-Fill Traveler Record</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {activeTab === 'docupass' && (
               <div className="flex flex-col gap-3">

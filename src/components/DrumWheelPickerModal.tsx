@@ -181,6 +181,15 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
     setSelectedDay(d.getDate());
   };
 
+  // Add days relative to the currently selected date on the wheel
+  const addDaysToSelected = (daysOffset: number) => {
+    const d = new Date(selectedYear, selectedMonth, effectiveDay);
+    d.setDate(d.getDate() + daysOffset);
+    setSelectedYear(d.getFullYear());
+    setSelectedMonth(d.getMonth());
+    setSelectedDay(d.getDate());
+  };
+
   // Quick preset actions for times
   const setQuickTime = (hours: number, minutes: number) => {
     setSelectedHour(hours);
@@ -260,7 +269,7 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
         </div>
 
         {/* Context-aware Quick Preset Chips */}
-        <div className="px-5 py-2 flex items-center gap-1.5 overflow-x-auto text-[10px] scrollbar-none">
+        <div className="px-5 py-2 flex flex-wrap items-center gap-1.5 text-[10px]">
           <span className="text-zinc-500 font-medium whitespace-nowrap">Presets:</span>
           {mode === 'date' && (
             <>
@@ -345,6 +354,22 @@ export const DrumWheelPickerModal: React.FC<DrumWheelPickerModalProps> = ({
                     className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-md border border-zinc-700 whitespace-nowrap transition-colors cursor-pointer"
                   >
                     In 1 Week
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate(0, 0, 14)}
+                    className="px-2 py-1 bg-indigo-950/70 hover:bg-indigo-900 text-indigo-200 rounded-md border border-indigo-700/60 font-medium whitespace-nowrap transition-colors cursor-pointer"
+                    title="Jump to 2 weeks (14 days) from today"
+                  >
+                    In 2 Weeks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addDaysToSelected(14)}
+                    className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-emerald-300 rounded-md border border-emerald-700/50 font-medium whitespace-nowrap transition-colors cursor-pointer"
+                    title="Add 2 weeks (14 days) to the currently selected date on the wheel"
+                  >
+                    +2 Wks
                   </button>
                   <button
                     type="button"
